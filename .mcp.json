@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "strix": {
+      "command": "node",
+      "args": ["bin/strix-mcp.mjs"],
+      "env": { "STRIX_URL": "http://localhost:3001" }
+    }
+  }
+}

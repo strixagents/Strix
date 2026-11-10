@@ -1,0 +1,178 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #0a0a0a;
+  --color-panel: #121212;
+  --color-line: rgb(255 255 255 / 0.09);
+  --color-muted: #9a9a9a;
+  --color-amber: #ffb547;
+  --color-ember: #ff6a3d;
+  --color-violet: #8b7bff;
+
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-serif-display), ui-serif, Georgia, serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --animate-marquee: marquee 40s linear infinite;
+  --animate-float: float 8s ease-in-out infinite;
+  --animate-blink: blink 1s step-end infinite;
+  --animate-spin-slow: spin 18s linear infinite;
+  --animate-scroll-y: scroll-y 14s linear infinite;
+  --animate-fade-up: fade-up 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-18px) scale(1.03); }
+  }
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes scroll-y {
+    from { transform: translateY(0); }
+    to { transform: translateY(-50%); }
+  }
+  @keyframes blink {
+    50% { opacity: 0; }
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 96px; /* anchors land below the sticky navbar */
+  color-scheme: dark;
+  -webkit-tap-highlight-color: transparent;
+  text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-ink);
+  color: #ededf2;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: rgb(255 181 71 / 0.3);
+}
+
+.bg-grid {
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.04) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 40%, transparent 100%);
+}
+
+.text-gradient {
+  background: linear-gradient(110deg, #fff 20%, var(--color-amber) 55%, var(--color-ember) 80%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.card-glow {
+  position: relative;
+  isolation: isolate;
+}
+.card-glow::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: radial-gradient(
+    400px circle at var(--mx, 50%) var(--my, 0%),
+    rgb(255 181 71 / 0.45),
+    transparent 45%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s;
+  z-index: -1;
+}
+.card-glow:hover::before {
+  opacity: 1;
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.8s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.reveal.in {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .reveal { opacity: 1; transform: none; }
+}
+
+/* Markdown answers from the agent */
+.prose-strix h1, .prose-strix h2, .prose-strix h3 { font-weight: 600; color: #fff; margin: 1em 0 0.4em; }
+.prose-strix h3 { font-size: 1rem; }
+.prose-strix p { margin: 0.5em 0; color: #d4d4dc; }
+.prose-strix strong { color: #fff; }
+.prose-strix ul, .prose-strix ol { margin: 0.4em 0; padding-left: 1.2em; color: #d4d4dc; }
+.prose-strix ul { list-style: disc; }
+.prose-strix ol { list-style: decimal; }
+.prose-strix li { margin: 0.15em 0; }
+.prose-strix blockquote { border-left: 2px solid var(--color-amber); padding-left: 0.75em; color: var(--color-muted); margin: 0.6em 0; }
+.prose-strix code { font-family: var(--font-mono); font-size: 0.85em; background: rgb(255 255 255 / 0.06); padding: 0.1em 0.35em; border-radius: 4px; }
+.prose-strix table { width: 100%; border-collapse: collapse; margin: 0.6em 0; font-size: 0.8rem; display: block; overflow-x: auto; }
+.prose-strix th, .prose-strix td { border: 1px solid var(--color-line); padding: 0.35em 0.5em; text-align: left; white-space: nowrap; }
+.prose-strix th { background: rgb(255 255 255 / 0.04); color: #fff; font-weight: 500; }
+.prose-strix a { color: var(--color-amber); text-decoration: underline; }
+
+/* ───────── Graphite-style primitives ───────── */
+@layer components {
+.btn-primary {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem; white-space: nowrap;
+  color: #0a0a0a; font-weight: 500; border-radius: 12px; border: 2px solid transparent;
+  background:
+    linear-gradient(#ececec, #ececec) padding-box,
+    linear-gradient(100deg, #f2c46d, #e48fd0 45%, #7cc4ff) border-box;
+  transition: filter .2s, transform .2s;
+}
+.btn-primary:hover { filter: brightness(1.06); }
+.btn-primary:active { transform: translateY(1px); }
+.btn-secondary {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  color: #ededed; font-weight: 500; border-radius: 12px;
+  background: #1a1a1a; border: 1px solid #2c2c2c; transition: background .2s;
+}
+.btn-secondary:hover { background: #222; }
+.btn-glow { position: relative; isolation: isolate; }
+.btn-glow::before {
+  content: ""; position: absolute; inset: -14px -24px; z-index: -1; border-radius: 999px; filter: blur(22px);
+  background: radial-gradient(closest-side at 30% 50%, rgb(45 212 191 / .55), transparent),
+              radial-gradient(closest-side at 75% 50%, rgb(168 85 247 / .55), transparent);
+}
+.frame {
+  position: relative; border-radius: 18px; border: 1px solid #222;
+  background: linear-gradient(180deg, #141414, #0c0c0c);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .04), 0 30px 60px -30px rgb(0 0 0 / .8);
+}
+.card-dark {
+  border-radius: 18px; border: 1px solid #232323;
+  background: radial-gradient(120% 80% at 50% 0%, #151515, #0b0b0b);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .05);
+}
+.neon {
+  color: transparent;
+  -webkit-text-stroke: 2px #fff;
+  text-shadow: 0 0 6px rgb(255 255 255 / .9), 0 0 24px rgb(255 255 255 / .55), 0 0 60px rgb(255 255 255 / .3);
+  letter-spacing: -0.02em;
+}
+.iso { transform: rotateX(58deg) rotateZ(-45deg); transform-style: preserve-3d; }
+}
