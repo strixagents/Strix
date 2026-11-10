@@ -1,6 +1,6 @@
 # Strix
 
-**The AI trading agent for Robinhood Chain (chain ID 4663).** Live charts, rug-risk checks, whale and wallet tracking, stock-token premiums and an AI analyst — all from real on-chain and market data.
+**The AI agent for Robinhood Chain (chain ID 4663)** — an on-chain agent with a built-in analyst, usable from the web, the CLI and any MCP client. Rug-risk checks, whale and wallet tracking, Rug Radar, stock-token premiums and live charts — all from real on-chain and market data.
 
 > Research tool only. Nothing here is financial advice.
 
@@ -8,13 +8,16 @@
 
 | | |
 |---|---|
-| **Terminal** (`/app`) | Candlestick charts (EMA 20/50/200, auto support/resistance), on-chain stats (liquidity, FDV, buys/sells, pool age), technical bias, ATR stop/target framework, position-size calculator, price alerts |
+| **Agent** (`/agent`) | Full-page AI agent: streams answers, runs live tools (scorecard, whales, wallets, Rug Radar, smart money…), shows data cards, slash commands and follow-up questions |
+| **Analyst** (`/app`) | Candlestick charts (EMA 20/50/200, auto support/resistance), on-chain stats (liquidity, FDV, buys/sells, pool age), price alerts — with the agent docked beside the chart |
 | **AI agent** | Ask in plain language — it calls live tools and explains the result. Groq primary, Google Gemini backup, rule-based fallback |
 | **Analyst panel** | A–F safety scorecard (honeypot, copycat, liquidity, holders, top-10 concentration, dev holding, wash trading), whale flow with bot/relayer detection, holder distribution |
 | **Screener** (`/screener`) | Top / trending / new pools with on-chain signals and risk scores |
 | **Stocks** (`/stocks`) | Official Robinhood stock tokens vs the real share price — premium/discount, lookalike tokens flagged |
 | **Wallet** (`/wallet`) | Any wallet's holdings with risk per token, fake-airdrop filter, 24h buys/sells (smart money), follow list |
-| **CLI** | `strix ask`, `analyze`, `safe`, `whales`, `scan`, `new`, `stocks`, `wallet`, `news` |
+| **Smart money** (`/smart-money`) | Wallets ranked by ~24h PnL, volume or activity on the most liquid tokens — bots and relayers removed, automated wallets labelled |
+| **Rug Radar** (`/radar`) | Background watcher: liquidity pulls, price crashes, sudden supply mints (read from chain logs) and copycat launches |
+| **CLI** | `strix ask`, `analyze`, `safe`, `whales`, `scan`, `new`, `stocks`, `wallet`, `smart`, `radar`, `news` |
 | **MCP server** | Use every Strix tool from Claude Code or any MCP client |
 
 ## Data sources (all free)
@@ -51,6 +54,8 @@ strix safe PONS
 strix whales CASHCAT
 strix stocks NVDA
 strix wallet 0x…
+strix radar
+strix smart volume
 strix ask "Is CASHCAT safe?"
 ```
 

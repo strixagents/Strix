@@ -42,7 +42,7 @@ server.registerTool(
   {
     title: "Analyze Robinhood Chain token",
     description:
-      "Live on-chain stats (price, % change, volume, liquidity, FDV, buys/sells, pool age), risk flags and technical analysis from DEX candles (EMA20/50/200, RSI, MACD, ATR, Bollinger, support/resistance, ATR-based stop/targets) for a Robinhood Chain (chain 4663) token.",
+      "Live on-chain stats (price, % change, volume, liquidity, FDV, buys/sells, pool age), risk flags and technical analysis from DEX candles (EMA20/50/200, RSI, MACD, ATR, Bollinger, support/resistance) for a Robinhood Chain (chain 4663) token.",
     inputSchema: { token, interval: z.enum(INTERVALS).optional().describe("Candle timeframe, default 1h") },
     annotations: ro,
   },
@@ -154,6 +154,39 @@ server.registerTool(
     annotations: ro,
   },
   (a) => call("get_news", a)
+);
+
+server.registerTool(
+  "compare_tokens",
+  {
+    title: "Compare tokens",
+    description: "Side-by-side comparison of 2–4 Robinhood Chain tokens: price, 24h change, liquidity, volume, FDV, pool age, risk level and flags.",
+    inputSchema: { tokens: z.array(z.string()).min(2).max(4).describe("Symbols or addresses") },
+    annotations: ro,
+  },
+  (a) => call("compare_tokens", a)
+);
+
+server.registerTool(
+  "get_rug_radar",
+  {
+    title: "Rug Radar",
+    description: "Live Robinhood Chain red-flag feed: liquidity pulls, price crashes, sudden supply mints and copycat token launches.",
+    inputSchema: { type: z.enum(["liquidity_pull", "crash", "mint", "copycat"]).optional() },
+    annotations: ro,
+  },
+  (a) => call("get_rug_radar", a)
+);
+
+server.registerTool(
+  "get_smart_money",
+  {
+    title: "Smart money leaderboard",
+    description: "Real wallets ranked by ~24h trading PnL on Robinhood Chain's most liquid tokens, with bots and relayers removed.",
+    inputSchema: { sort: z.enum(["pnl", "volume", "trades"]).optional() },
+    annotations: ro,
+  },
+  (a) => call("get_smart_money", a)
 );
 
 await server.connect(new StdioServerTransport());

@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
-import { AgentDemo } from "@/components/AgentDemo";
+import { AgentChat } from "@/components/terminal/AgentChat";
 import { Logo } from "@/components/Logo";
 import { FaqItem, Reveal } from "@/components/Interactive";
 import { Frame, SectionTitle } from "@/components/landing/Frame";
 import { LiveCarousel } from "@/components/landing/LiveCarousel";
 import { HeroOrbit, ScaledOrbit } from "@/components/landing/HeroOrbit";
-import { LiveAgentPanel, LiveAlertPreview, MiniScreener, LiveChainPulse, LiveRiskCheck, StatusDot } from "@/components/landing/Widgets";
+import { Aurora } from "@/components/landing/Aurora";
+import { LiveAgentPanel, MiniScreener, LiveChainPulse, LiveRiskCheck, StatusDot } from "@/components/landing/Widgets";
 import { WalletButton } from "@/components/WalletButton";
 
 const faqs = [
@@ -27,33 +28,43 @@ const faqs = [
     a: "No. Connecting is optional: it adds Robinhood Chain to your wallet and shows your ETH balance. Strix never asks you to sign a transaction.",
   },
   { q: "Which wallets does Strix support?", a: "Any injected EVM wallet such as MetaMask or Rabby. One click adds Robinhood Chain (chain ID 4663) to your wallet." },
-  { q: "Does Strix tell me what to buy?", a: "No. Strix lays out data, scenarios and risk. You make the call. Nothing here is financial advice." },
+  {
+    q: "Can I use the agent outside the browser?",
+    a: "Yes. The same agent and the same live tools are available as a CLI (strix ask, strix radar, strix wallet…) and as an MCP server for Claude Code and other MCP clients. Source and setup are on GitHub.",
+  },
+  { q: "Does Strix tell me what to buy?", a: "No. Strix is a research agent: it reads on-chain data, checks the risk and explains what it finds. It never gives buy/sell calls, entries or targets. Nothing here is financial advice." },
 ];
 
-const sources = ["Robinhood Chain", "GeckoTerminal", "DexScreener", "Uniswap", "Blockscout"];
+// only services Strix actually reads data from
+const sources = ["Robinhood Chain RPC", "GeckoTerminal", "DexScreener", "Yahoo Finance", "Google News"];
 
 const pills = [
-  { icon: "🐸", t: "Memecoins" },
-  { icon: "📈", t: "Tokenized stocks" },
-  { icon: "🚀", t: "New pools" },
-  { icon: "🛡", t: "Risk check" },
-  { icon: "⌕", t: "Screener" },
-  { icon: "🔔", t: "Price alerts" },
   { icon: "✦", t: "AI Agent" },
-  { icon: "⛓", t: "Chain 4663" },
+  { icon: "🛡", t: "Safety scorecard" },
+  { icon: "🐋", t: "Whale tracker" },
+  { icon: "👛", t: "Wallet scanner" },
+  { icon: "🚨", t: "Rug Radar" },
+  { icon: "🧠", t: "Smart money" },
+  { icon: ">_", t: "CLI" },
+  { icon: "⧉", t: "MCP server" },
 ];
 
 export default function Home() {
   return (
-    <div className="bg-ink">
+    <div className="relative bg-ink">
+      {/* ───── aurora behind navbar + hero (full width, fades out downward) ───── */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[760px] overflow-hidden [mask-image:linear-gradient(to_bottom,transparent_0,#000_8%,#000_50%,transparent_100%)] sm:h-[980px]" aria-hidden>
+        <Aurora className="h-full w-full" />
+      </div>
+
       {/* ───── announcement bar ───── */}
       <Link
-        href="/stocks"
-        className="flex items-center justify-between gap-4 border-b border-[#1f1f1f] bg-[#0d0d0d] px-5 py-3.5 text-[15px] sm:px-8"
+        href="/agent"
+        className="relative z-10 flex items-center justify-between gap-4 border-b border-white/[0.06] bg-[#0d0d0d]/60 px-5 py-3.5 text-[15px] backdrop-blur-md sm:px-8"
       >
         <span className="leading-snug text-white">
-          New: stock tokens vs the real stock, and a wallet scanner.
-          <span className="block text-zinc-300 sm:inline"> See premiums on NVDA, TSLA, SPY and more — and what any wallet is buying.</span>
+          New: the full-page Strix Agent.
+          <span className="block text-zinc-300 sm:inline"> Rug Radar, smart money, wallets and the safety scorecard are now tools it runs for you — in the browser, the CLI or MCP.</span>
         </span>
         <span className="flex shrink-0 items-center gap-1.5 text-muted">
           Try it <span aria-hidden>→</span>
@@ -62,7 +73,7 @@ export default function Home() {
 
       <Navbar />
 
-      <main className="overflow-x-clip">
+      <main className="relative overflow-x-clip">
         {/* ───── hero ───── */}
         <section className="relative mx-auto max-w-6xl px-5 pb-12 pt-12 sm:px-8 sm:pb-16 sm:pt-28">
           {/* orbit: full size on wide screens, scaled on laptops, centered under the CTA on phones */}
@@ -74,32 +85,33 @@ export default function Home() {
           </div>
           <Reveal>
             <h1 className="max-w-4xl text-[2.85rem] font-semibold leading-[1] tracking-[-0.035em] sm:text-7xl lg:text-8xl">
-              The AI trading agent for Robinhood Chain.
+              The AI agent for Robinhood Chain.
             </h1>
           </Reveal>
           <Reveal delay={80}>
             <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted sm:mt-8 sm:text-2xl">
-              Strix reads Robinhood Chain pools live, does the math, flags the rug risk, and lays out clear scenarios — entry, stop and targets.
+              An on-chain AI agent with a built-in analyst. Ask in plain English — or from your CLI and MCP client — and Strix reads the chain live, checks the rug risk and explains what it finds.
             </p>
           </Reveal>
           <Reveal delay={160}>
             <div className="mt-10 grid gap-3 sm:flex">
-              <Link href="/app" className="btn-primary px-7 py-3.5 text-base sm:py-4 sm:text-lg">
-                Get started for free <span aria-hidden>→</span>
+              <Link href="/agent" className="btn-primary px-7 py-3.5 text-base sm:py-4 sm:text-lg">
+                Talk to the agent <span aria-hidden>→</span>
               </Link>
-              <Link href="/screener" className="btn-secondary px-7 py-3.5 text-base sm:py-4 sm:text-lg">
-                Open the screener
+              <Link href="/app" className="btn-secondary px-7 py-3.5 text-base sm:py-4 sm:text-lg">
+                Open the analyst
               </Link>
             </div>
             <p className="mt-6 max-w-md text-base leading-relaxed text-muted sm:text-lg">
-              Free. No sign-up. Memecoins, launchpad tokens and tokenized stocks — all on-chain.
+              Free. No sign-up. In your browser, your terminal (CLI) and any MCP client.
             </p>
             <WalletButton className="mt-5 inline-block" />
             <ScaledOrbit scale={0.66} className="pointer-events-none mx-auto mt-12 lg:hidden" />
           </Reveal>
 
           <Reveal delay={240}>
-            <div className="mt-12 flex flex-wrap items-center gap-x-8 gap-y-3 text-base font-semibold tracking-tight text-[#6d6d6d] sm:mt-16 sm:gap-x-12 sm:text-xl">
+            <div className="mt-12 text-xs uppercase tracking-widest text-[#555] sm:mt-16">Live data from</div>
+            <div className="mt-3 flex flex-wrap items-center gap-x-8 gap-y-3 text-base font-semibold tracking-tight text-[#6d6d6d] sm:gap-x-12 sm:text-xl">
               {sources.map((s) => (
                 <span key={s}>{s}</span>
               ))}
@@ -107,9 +119,10 @@ export default function Home() {
           </Reveal>
 
           <Reveal delay={300} className="mt-16">
-            <div className="card-dark p-3 [perspective:1600px] sm:p-5">
-              <div className="origin-top transition-transform duration-700 [transform:rotateX(8deg)] hover:[transform:rotateX(0deg)]">
-                <AgentDemo />
+            <div className="card-dark p-3 sm:p-5">
+              {/* the real agent — same API, tools and limits as /agent, not a recording */}
+              <div className="mx-auto h-[600px] max-w-3xl overflow-hidden rounded-xl border border-[#2a2a2a] bg-[#111] sm:h-[640px]">
+                <AgentChat />
               </div>
             </div>
           </Reveal>
@@ -127,8 +140,8 @@ export default function Home() {
           <div>
             <Reveal>
               <SectionTitle
-                title={<>The AI analyst you<br className="hidden sm:block" /> can trade with</>}
-                sub="Ask about any Robinhood Chain token and get live context — trend, liquidity, buy/sell flow, key levels and risk — right next to your chart."
+                title={<>An agent that does<br className="hidden sm:block" /> the research</>}
+                sub="Ask about any Robinhood Chain token. Strix picks the tools — safety scorecard, whales, wallets, chart — runs them on live data and explains what it found."
               />
             </Reveal>
             <Reveal>
@@ -141,8 +154,8 @@ export default function Home() {
           <div>
             <Reveal>
               <SectionTitle
-                title="Scan faster, trade sooner"
-                sub="Scan the most active pools on the chain for momentum, volume spikes, buy pressure and fresh launches — with a risk score on every row."
+                title="It watches the whole chain"
+                sub="The agent's screener tool tracks the most active pools for volume spikes, buy pressure and fresh launches — with a risk score on every row."
               />
             </Reveal>
             <Reveal>
@@ -155,7 +168,7 @@ export default function Home() {
           <div>
             <Reveal>
               <SectionTitle
-                title={<>Spot rug risk<br className="hidden sm:block" /> before you ape in</>}
+                title={<>Spots rug risk<br className="hidden sm:block" /> before you do</>}
                 sub="Thin liquidity, hours-old pools, FDV a hundred times the pool, one-sided selling — Strix flags it before your wallet finds out."
               />
             </Reveal>
@@ -184,22 +197,22 @@ export default function Home() {
         {/* ───── everything you need ───── */}
         <section className="mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-24">
           <Reveal>
-            <SectionTitle center title={<>Everything you need<br />to trade smarter</>} sub="One terminal to research, plan and track every trade." />
+            <SectionTitle center title={<>One agent,<br />three ways to use it</>} sub="The browser, your terminal and your MCP client — the same agent and the same live tools everywhere." />
           </Reveal>
 
           <div className="mt-16 space-y-6">
             <Reveal>
               <div className="card-dark overflow-hidden p-6 sm:p-10">
-                <h3 className="text-2xl font-semibold tracking-tight sm:text-4xl">Never miss a level again</h3>
+                <h3 className="text-2xl font-semibold tracking-tight sm:text-4xl">Talk to it from your terminal</h3>
                 <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted sm:text-xl">
-                  Set price alerts on any Robinhood Chain token. Strix watches the pool and pings you with a sound and a notification the moment price gets there.
+                  The Strix CLI and MCP server call the exact tools the web agent uses. Ask questions, scan wallets or check the Rug Radar without leaving your shell — or let Claude Code and other MCP clients use Strix as a tool.
                 </p>
                 <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-5">
-                  <Link href="/app" className="btn-glow rounded-full bg-white px-7 py-3.5 text-lg font-medium text-black">
-                    Set your first alert
-                  </Link>
-                  <Link href="/app" className="flex items-center gap-2 text-lg text-white">
-                    Open the terminal <span aria-hidden>→</span>
+                  <a href="https://github.com/strixagents/Strix" target="_blank" rel="noreferrer" className="btn-glow rounded-full bg-white px-7 py-3.5 text-lg font-medium text-black">
+                    Get the CLI on GitHub
+                  </a>
+                  <Link href="/agent" className="flex items-center gap-2 text-lg text-white">
+                    Or use it in the browser <span aria-hidden>→</span>
                   </Link>
                 </div>
                 <div className="relative mt-12 sm:ml-auto sm:max-w-xl">
@@ -208,9 +221,23 @@ export default function Home() {
                       <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" />
                       <span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" />
                       <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
-                      <span className="ml-auto text-[11px] text-[#777]">live prices · pick one to alert</span>
+                      <span className="ml-auto text-[11px] text-[#777]">strix — commands</span>
                     </div>
-                    <LiveAlertPreview />
+                    <div className="space-y-1.5 p-4 text-[#ccc]">
+                      {[
+                        ["strix ask \"Is PONS safe?\"", "AI agent with live tools"],
+                        ["strix safe CASHCAT", "A–F safety scorecard"],
+                        ["strix whales PONS", "whale flow, bots filtered"],
+                        ["strix wallet 0x…", "holdings, risk, 24h trades"],
+                        ["strix radar", "liquidity pulls, mints, copycats"],
+                        ["strix smart", "most active real wallets"],
+                      ].map(([c, d]) => (
+                        <div key={c} className="flex flex-wrap gap-x-3">
+                          <span><span className="text-emerald-400">$</span> {c}</span>
+                          <span className="text-[#666]"># {d}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -218,12 +245,12 @@ export default function Home() {
 
             <Reveal>
               <div className="card-dark overflow-hidden p-6 sm:p-10">
-                <h3 className="text-2xl font-semibold tracking-tight sm:text-4xl">One terminal for the whole chain.</h3>
+                <h3 className="text-2xl font-semibold tracking-tight sm:text-4xl">Every tool the agent uses.</h3>
                 <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted sm:text-xl">
-                  Chart, AI agent, screener, risk check, alerts and position sizing — unified for Robinhood Chain.
+                  Safety scorecard, whale tracker, wallet scanner, Rug Radar, smart money, screener and stock-token premiums — the agent runs them for you, and you can open each one yourself.
                 </p>
-                <Link href="/app" className="mt-8 inline-flex items-center gap-2 text-lg text-white">
-                  Explore the terminal <span aria-hidden>→</span>
+                <Link href="/agent" className="mt-8 inline-flex items-center gap-2 text-lg text-white">
+                  Talk to the agent <span aria-hidden>→</span>
                 </Link>
                 <div className="relative mt-8 h-80 overflow-hidden [mask-image:linear-gradient(to_bottom,transparent,#000_20%,#000_80%,transparent)]">
                   <div className="flex animate-scroll-y flex-col items-center gap-4">
@@ -261,7 +288,7 @@ export default function Home() {
           </div>
           <div className="space-y-14">
             {[
-              { t: "Where decisions happen", d: "Plan every trade with levels, stops, size and a risk score before you ape in — not after." },
+              { t: "An agent, not a signal bot", d: "Strix researches and explains — liquidity, holders, whales, red flags. It never tells you what to buy or sell. You make the call." },
               { t: "Native to Robinhood Chain", d: "Chain 4663 RPC plus Uniswap, Pons and other DEX pools via GeckoTerminal and DexScreener, refreshed continuously." },
               { t: "Built on real math", d: "EMA, RSI, MACD, ATR and Bollinger computed from raw candles. No guessed prices." },
             ].map((x) => (
@@ -286,17 +313,20 @@ export default function Home() {
         </section>
 
         {/* ───── final CTA ───── */}
-        <section className="px-5 py-20 text-center sm:px-8 sm:py-32">
-          <Reveal>
+        <section className="relative overflow-hidden px-5 py-20 text-center sm:px-8 sm:py-32">
+          <div className="pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_70%_75%_at_50%_45%,#000_30%,transparent_75%)]" aria-hidden>
+            <Aurora className="h-full w-full" intensity={0.8} scale={0.4} />
+          </div>
+          <Reveal className="relative">
             <h2 className="mx-auto max-w-3xl text-3xl font-semibold leading-[1.1] tracking-tight text-balance sm:text-6xl">
-              Built for Robinhood Chain traders. Free for everyone.
+              One agent for Robinhood Chain — web, CLI and MCP. Free for everyone.
             </h2>
             <div className="mx-auto mt-10 grid max-w-xl gap-3 sm:mt-12 sm:grid-cols-2">
-              <Link href="/screener" className="btn-secondary px-4 py-4 text-lg">
-                Open screener
+              <Link href="/app" className="btn-secondary px-4 py-4 text-lg">
+                Open the analyst
               </Link>
-              <Link href="/app" className="btn-primary px-4 py-4 text-lg">
-                Start free <span aria-hidden>→</span>
+              <Link href="/agent" className="btn-primary px-4 py-4 text-lg">
+                Talk to the agent <span aria-hidden>→</span>
               </Link>
             </div>
           </Reveal>
@@ -309,9 +339,9 @@ export default function Home() {
           <Logo className="mb-12 h-11 w-11" mono />
           <div className="grid grid-cols-2 gap-x-8 gap-y-12 md:grid-cols-4">
             {[
-              { h: "Product", l: [["Terminal", "/app"], ["Screener", "/screener"], ["AI Agent", "/app"], ["Price alerts", "/app"], ["Risk check", "/app"]] },
-              { h: "Robinhood Chain", l: [["Top tokens", "/screener"], ["Trending", "/screener"], ["New pools", "/screener"], ["Explorer", "https://robinhoodchain.blockscout.com"]] },
-              { h: "Resources", l: [["FAQ", "/#faq"], ["Features", "/#features"]] },
+              { h: "Agent", l: [["AI Agent", "/agent"], ["Analyst", "/app"], ["Rug Radar", "/radar"], ["Smart money", "/smart-money"], ["Wallet scanner", "/wallet"]] },
+              { h: "Robinhood Chain", l: [["Screener", "/screener"], ["Stock tokens", "/stocks"], ["New pools", "/screener"], ["Explorer", "https://robinhoodchain.blockscout.com"]] },
+              { h: "Developers", l: [["CLI & MCP", "https://github.com/strixagents/Strix"], ["FAQ", "/#faq"], ["Features", "/#features"]] },
               { h: "Data", l: [["GeckoTerminal", "https://www.geckoterminal.com/robinhood/pools"], ["DexScreener", "https://dexscreener.com/robinhood"], ["Blockscout", "https://robinhoodchain.blockscout.com"]] },
             ].map((c) => (
               <div key={c.h}>

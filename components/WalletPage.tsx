@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AppHeader } from "./AppHeader";
 import { Pct, RISK_LABELS, TokenIcon, fmtPrice, fmtUsd, riskCls } from "./market-ui";
+import { store, useStore, type Followed } from "./store";
 
 type Risk = { flags: string[]; score: number; level: "Low" | "Medium" | "High" };
 type Holding = {
@@ -18,7 +19,6 @@ type Scan = {
   activity: { hours: number; coveredHours: number; complete: boolean; trades: Trade[]; airdrops: number; swaps: number; netFlows: { token: string; symbol: string; inUsd: number; outUsd: number; netUsd: number; trades: number }[] };
   error?: string;
 };
-type Followed = { address: string; label: string };
 
 const EXPLORER = "https://robinhoodchain.blockscout.com";
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
@@ -34,15 +34,6 @@ const KIND: Record<Trade["kind"], { label: string; cls: string }> = {
   received: { label: "Received", cls: "bg-sky-400/10 text-sky-300" },
   airdrop: { label: "Airdrop", cls: "bg-white/5 text-muted" },
 };
-const FOLLOW_KEY = "strix.follow";
-
-function loadFollowed(): Followed[] {
-  try {
-    return JSON.parse(localStorage.getItem(FOLLOW_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
 
 export function WalletPage() {
   const params = useSearchParams();
@@ -52,9 +43,8 @@ export function WalletPage() {
   const [scan, setScan] = useState<Scan | null>(null);
   const [loading, setLoading] = useState(false);
   const [showSpam, setShowSpam] = useState(false);
-  const [followed, setFollowed] = useState<Followed[]>([]);
+  const followed = useStore<Followed[]>(store.followed, []);
 
-  useEffect(() => setFollowed(loadFollowed()), []);
 
   useEffect(() => {
     if (!/^0x[0-9a-fA-F]{40}$/.test(address)) return;
@@ -89,14 +79,8 @@ export function WalletPage() {
     if (acc[0]) submit(acc[0]);
   };
 
-  const isFollowed = followed.some((f) => f.address === address);
-  const toggleFollow = () => {
-    const next = isFollowed ? followed.filter((f) => f.address !== address) : [...followed, { address, label: short(address) }];
-    setFollowed(next);
-    try {
-      localStorage.setItem(FOLLOW_KEY, JSON.stringify(next));
-    } catch {}
-  };
+  const isFollowed = followed.some((f) => f.address.toLowerCase() === address.toLowerCase());
+  const toggleFollow = () => (isFollowed ? store.unfollow(address) : store.follow({ address, label: short(address) }));
 
   const real = scan?.holdings?.filter((h) => !h.spam) ?? [];
   const spam = scan?.holdings?.filter((h) => h.spam) ?? [];
@@ -279,7 +263,7 @@ export function WalletPage() {
 
         {!scan && !loading && (
           <div className="mt-8 rounded-2xl border border-dashed border-line p-6 text-sm text-muted">
-            Tip: open any token in the <Link href="/app" className="text-white underline">terminal</Link>, go to <b>Analyst → Whales</b> and click a wallet to see everything it has been trading.
+            Tip: open any token in the <Link href="/app" className="text-white underline">analyst</Link>, go to <b>Whales</b> and click a wallet to see everything it has been trading.
           </div>
         )}
       </main>

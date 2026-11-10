@@ -35,7 +35,7 @@ export function LiveCarousel() {
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" /> {t.symbol} × Robinhood Chain
               </span>
               <p className="mt-4 text-xl leading-snug text-zinc-300 sm:text-2xl">
-                {t.name} is <Pct v={t.change.h24} /> in 24h. See the chart, on-chain risk and a full trade plan in one click.
+                {t.name} is <Pct v={t.change.h24} /> in 24h. Ask the agent — chart context, on-chain risk and whales in one click.
               </p>
             </div>
           </Link>

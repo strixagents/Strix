@@ -12,7 +12,6 @@ import { WalletButton } from "../WalletButton";
 import { AppNav } from "../AppHeader";
 import { AgentChat } from "./AgentChat";
 import { PriceChart, type Candle } from "./PriceChart";
-import { RiskCalc } from "./RiskCalc";
 import { Alerts } from "./Alerts";
 import { AnalystPanel } from "./AnalystPanel";
 
@@ -24,7 +23,6 @@ type Analysis = {
   atr: number | null; atrPct: number | null; bollinger: { upper: number; middle: number; lower: number } | null;
   support: { price: number; touches: number }[]; resistance: { price: number; touches: number }[];
   volumeVsAvg20: number | null; score: number; bias: string; reasons: string[];
-  riskPlan: { long: { stop: number; tp1: number; tp2: number }; short: { stop: number; tp1: number; tp2: number } } | null;
 };
 type CandleResp = {
   token: Token & { links: { explorer: string; geckoterminal: string; dexscreener: string } };
@@ -389,24 +387,10 @@ export function Terminal() {
                             ))}
                           </div>
                         </div>
-                        {a.riskPlan && (
-                          <div className="rounded-2xl border border-line bg-panel p-4">
-                            <div className="mb-2 text-[11px] uppercase tracking-wide text-muted">ATR risk framework</div>
-                            <table className="w-full font-mono text-sm">
-                              <thead><tr className="text-left text-xs text-muted"><th /><th className="font-normal">Stop</th><th className="font-normal">TP1</th><th className="font-normal">TP2</th></tr></thead>
-                              <tbody className="tabular-nums">
-                                <tr><td className="text-emerald-400">Long</td><td>{fmtPrice(a.riskPlan.long.stop)}</td><td>{fmtPrice(a.riskPlan.long.tp1)}</td><td>{fmtPrice(a.riskPlan.long.tp2)}</td></tr>
-                                <tr><td className="text-rose-400">Short</td><td>{fmtPrice(a.riskPlan.short.stop)}</td><td>{fmtPrice(a.riskPlan.short.tp1)}</td><td>{fmtPrice(a.riskPlan.short.tp2)}</td></tr>
-                              </tbody>
-                            </table>
-                            <p className="mt-2 text-[11px] text-muted">Stop = 1.5×ATR. A framework, not a signal.</p>
-                          </div>
-                        )}
                       </div>
                     </>
                   )}
 
-                  <RiskCalc key={`${t.pool}-${interval}`} price={t.price} defaultStop={a?.riskPlan?.long.stop} defaultTarget={a?.riskPlan?.long.tp1} currency="USD" />
                 </div>
               )}
 

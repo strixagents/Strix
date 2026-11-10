@@ -142,7 +142,15 @@ export type Token = {
   liquidity: number; fdv: number | null; mcap: number | null; createdAt: string | null; ageHours: number | null;
   /** Another, older token on the chain uses the same symbol. */
   copycatOf?: string;
+  /** The data source reported an impossible liquidity figure (spoofed pool) — the number was discarded. */
+  fakeLiquidity?: boolean;
 };
+
+/** No single pool on this chain holds billions; such numbers come from spoofed pools and must not look "safe". */
+const MAX_SANE_LIQUIDITY = 2e9;
+function saneLiquidity(v: number): { liquidity: number; fakeLiquidity?: boolean } {
+  return Number.isFinite(v) && v <= MAX_SANE_LIQUIDITY ? { liquidity: v } : { liquidity: 0, fakeLiquidity: true };
+}
 
 const STABLES = new Set(["USDG", "USDC", "USDT", "USDE", "DAI", "PYUSD", "USD1"]);
 const unescape = (s: string) =>
@@ -175,7 +183,7 @@ function parsePools(list: GTList): Token[] {
         h1: { buys: t1.buys, sells: t1.sells },
         h24: { buys: t24.buys, sells: t24.sells, buyers: t24.buyers ?? 0, sellers: t24.sellers ?? 0 },
       },
-      liquidity: num(a.reserve_in_usd),
+      ...saneLiquidity(num(a.reserve_in_usd)),
       fdv: a.fdv_usd ? +a.fdv_usd : null,
       mcap: a.market_cap_usd ? +a.market_cap_usd : null,
       createdAt: a.pool_created_at,
@@ -215,9 +223,15 @@ function markCopycats(list: Token[], reference: Token[] = []): Token[] {
   }
   return list.map((t) => {
     const o = original.get(t.symbol.toUpperCase());
-    return o && o.address.toLowerCase() !== t.address.toLowerCase() ? { ...t, copycatOf: o.address } : t;
+    if (!o || o.address.toLowerCase() === t.address.toLowerCase()) return t;
+    // a days-old copy "holding" far more liquidity than the token it imitates is not believable
+    const implausible = (t.ageHours ?? 0) < 24 * 7 && t.liquidity > 1_000_000 && t.liquidity > 5 * Math.max(o.liquidity, 1);
+    return implausible ? { ...t, copycatOf: o.address, liquidity: 0, fakeLiquidity: true } : { ...t, copycatOf: o.address };
   });
 }
+
+/** Tokens whose numbers can be trusted in chain-wide totals and rankings (no copycats, no fake liquidity). */
+export const trusted = (t: Token) => !t.copycatOf && !t.fakeLiquidity;
 
 const INC = "include=base_token,quote_token,dex";
 
@@ -244,7 +258,7 @@ function fromDS(p: DSPair): Token {
       h1: { buys: p.txns?.h1?.buys ?? 0, sells: p.txns?.h1?.sells ?? 0 },
       h24: { buys: p.txns?.h24?.buys ?? 0, sells: p.txns?.h24?.sells ?? 0, buyers: 0, sellers: 0 },
     },
-    liquidity: p.liquidity?.usd ?? 0, fdv: p.fdv ?? null, mcap: p.marketCap ?? null,
+    ...saneLiquidity(p.liquidity?.usd ?? 0), fdv: p.fdv ?? null, mcap: p.marketCap ?? null,
     createdAt: p.pairCreatedAt ? new Date(p.pairCreatedAt).toISOString() : null,
     ageHours: p.pairCreatedAt ? (Date.now() - p.pairCreatedAt) / 3_600_000 : null,
   };
@@ -270,7 +284,7 @@ async function freshen(list: Token[], key: string): Promise<Token[]> {
     const l = live.get(t.pool.toLowerCase());
     if (!l || !l.price) return t;
     return {
-      ...t, price: l.price, change: l.change, liquidity: l.liquidity || t.liquidity, fdv: l.fdv ?? t.fdv, mcap: l.mcap ?? t.mcap,
+      ...t, price: l.price, change: l.change, liquidity: l.fakeLiquidity || t.fakeLiquidity ? 0 : l.liquidity || t.liquidity, fakeLiquidity: t.fakeLiquidity || l.fakeLiquidity, fdv: l.fdv ?? t.fdv, mcap: l.mcap ?? t.mcap,
       volume: { h1: l.volume.h1, h6: l.volume.h6, h24: Math.max(t.volume.h24, l.volume.h24) },
       txns: { h1: l.txns.h1, h24: { ...t.txns.h24, buys: l.txns.h24.buys, sells: l.txns.h24.sells } },
       image: t.image ?? l.image,
@@ -512,6 +526,7 @@ export const RISKS = {
   sell_pressure: { label: "Heavy selling", hint: "24h sells > 1.5× buys", w: 10 },
   copycat: { label: "Possible copycat", hint: "An older token on Robinhood Chain uses the same symbol — check the contract address", w: 35 },
   wash_volume: { label: "Wash volume", hint: "24h volume is more than 50× liquidity — likely wash trading or a drained pool", w: 20 },
+  fake_liquidity: { label: "Fake liquidity", hint: "The pool reports an impossible liquidity figure — a spoofed pool; real liquidity is unknown", w: 40 },
 } as const;
 export type RiskKey = keyof typeof RISKS;
 
@@ -540,6 +555,7 @@ export function risksFor(t: Token): { flags: RiskKey[]; score: number; level: "L
   if (t.txns.h24.buyers > 0 && t.txns.h24.buyers < 25) f.push("few_traders");
   if (t.txns.h24.sells > 50 && t.txns.h24.sells > 1.5 * t.txns.h24.buys) f.push("sell_pressure");
   if (t.copycatOf) f.push("copycat");
+  if (t.fakeLiquidity) f.push("fake_liquidity");
   if (t.liquidity > 0 && t.volume.h24 > 50 * t.liquidity && t.volume.h24 > 10_000) f.push("wash_volume");
   const score = Math.min(100, f.reduce((s, k) => s + RISKS[k].w, 0));
   return { flags: f, score, level: score >= 45 ? "High" : score >= 20 ? "Medium" : "Low" };

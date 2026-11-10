@@ -74,7 +74,7 @@ export function HeroOrbit() {
                     <Link
                       href={`/app?pool=${t.pool}`}
                       className="group pointer-events-auto relative flex flex-col items-center"
-                      title={`${t.symbol} · open in terminal`}
+                      title={`${t.symbol} · open in the analyst`}
                     >
                       <span className="rounded-full p-[3px] ring-1 ring-white/15 transition group-hover:scale-110 group-hover:ring-white/50" style={{ background: "rgba(20,20,20,0.9)" }}>
                         <TokenIcon t={t} size={r.iconSize} />

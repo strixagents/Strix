@@ -57,7 +57,7 @@ type Candle = { time: number; open: number; high: number; low: number; close: nu
 type CandleResp = {
   token: Token & { risk?: { level: "Low" | "Medium" | "High"; flags: string[] } };
   candles: Candle[];
-  analysis: { bias: string; rsi: number | null; ema50: number | null; support: { price: number }[]; resistance: { price: number }[]; riskPlan: { long: { stop: number } } | null } | null;
+  analysis: { bias: string; rsi: number | null; ema50: number | null; support: { price: number }[]; resistance: { price: number }[] } | null;
   candlesPending?: boolean;
 };
 
@@ -138,9 +138,9 @@ export function LiveAgentPanel() {
           <li>Analyze any token</li>
           <li>Find what&apos;s moving — with a risk score</li>
           <li>Vet new launches for rug risk</li>
-          <li>Plan entry, stop &amp; targets</li>
+          <li>Scan any wallet or the Rug Radar</li>
         </ul>
-        <Link href={t ? `/app?pool=${t.pool}` : "/app"} className="mt-auto block rounded-lg border border-[#3b5bdb]/60 bg-[#111] px-3 py-3 text-[#777] transition hover:text-white">
+        <Link href={t ? `/agent?q=${encodeURIComponent(`Full due diligence on ${t.symbol}`)}` : "/agent"} className="mt-auto block rounded-lg border border-[#3b5bdb]/60 bg-[#111] px-3 py-3 text-[#777] transition hover:text-white">
           Ask Strix about {t?.symbol ?? "a token"}…
         </Link>
       </div>
@@ -191,7 +191,7 @@ export function LiveRiskCheck() {
           </div>
           {tk && (
             <Link href={`/app?pool=${tk.pool}`} className="mt-4 inline-block text-[12px] text-zinc-400 hover:text-white">
-              Open {tk.symbol} in the terminal →
+              Open {tk.symbol} in the analyst →
             </Link>
           )}
         </>
@@ -244,7 +244,7 @@ export function StatusDot() {
   );
 }
 
-/** Live prices of the top tokens, each one a shortcut to set a real alert in the terminal. */
+/** Live prices of the top tokens, each one a shortcut to set a real alert in the analyst. */
 export function LiveAlertPreview() {
   const { data } = usePoll<Overview>("/api/overview", 30_000);
   const list = data?.tokens.filter((t) => t.liquidity > 500_000 && (t.ageHours ?? 0) > 72 && !t.risk?.flags.includes("copycat")).slice(0, 4) ?? [];

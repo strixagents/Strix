@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Strix CLI — the Robinhood Chain AI trading agent in your terminal.
+// Strix CLI — the Robinhood Chain AI agent in your terminal.
 // Talks to a running Strix server (default http://localhost:3001, override with STRIX_URL).
 
 const BASE = (process.env.STRIX_URL || "http://localhost:3001").replace(/\/$/, "");
@@ -91,6 +91,8 @@ const commands = {
     const dec = new TextDecoder();
     let buf = "";
     let answer = "";
+    let next = [];
+    let meta = null;
     for await (const chunk of res.body) {
       buf += dec.decode(chunk, { stream: true });
       const lines = buf.split("\n");
@@ -98,15 +100,19 @@ const commands = {
       for (const line of lines) {
         if (!line.trim()) continue;
         const e = JSON.parse(line);
+        if (e.t === "answer") answer = e.text;
+        else if (e.t === "followups") next = e.items;
+        else if (e.t === "meta") meta = e;
         if (JSON_OUT) continue;
         if (e.t === "step") process.stderr.write(`${cyan("◐")} ${dim(e.label)}\n`);
         else if (e.t === "step_done") process.stderr.write(`  ${e.ok ? green("✓") : red("✕")} ${gray(e.summary)}\n`);
         else if (e.t === "error") process.stderr.write(`  ${yellow("!")} ${gray("AI provider busy — falling back")}\n`);
-        else if (e.t === "answer") answer = e.text;
       }
     }
-    if (JSON_OUT) return console.log(JSON.stringify({ answer }, null, 2));
+    if (JSON_OUT) return console.log(JSON.stringify({ answer, followups: next, meta }, null, 2));
     console.log("\n" + md(answer) + "\n");
+    if (meta) console.log(gray(`${meta.tools} live tools · ${(meta.ms / 1000).toFixed(1)}s · ${meta.model}`));
+    if (next.length) console.log(gray("Try next:\n") + next.map((x) => `  strix ask "${x}"`).join("\n") + "\n");
   },
 
   async overview() {
@@ -146,11 +152,6 @@ const commands = {
         const lv = (a) => (a ?? []).map((x) => price(x.price ?? x)).join("  ") || "–";
         console.log(`  ${red("R")} ${lv(ta.resistance)}`);
         console.log(`  ${green("S")} ${lv(ta.support)}`);
-        if (ta.riskPlan) {
-          const p = ta.riskPlan;
-          console.log(`  long  stop ${price(p.long.stop)} · TP1 ${price(p.long.tp1)} · TP2 ${price(p.long.tp2)}`);
-          console.log(`  short stop ${price(p.short.stop)} · TP1 ${price(p.short.tp1)} · TP2 ${price(p.short.tp2)}`);
-        }
         console.log(gray(`  ${ta.reasons.join("; ")}`));
       } else console.log(gray(`\n${d.technical}`));
       console.log(gray(`\n${d.links.geckoterminal}\n`));
@@ -256,6 +257,35 @@ const commands = {
     });
   },
 
+  async compare() {
+    if (rest.length < 2) fail("Usage: strix compare <token> <token> [token] [token]");
+    await run(`Comparing ${rest.join(" vs ")}…`, "compare_tokens", { tokens: rest.slice(0, 4) }, (d) => {
+      console.log(`
+${pad(bold("Token"), 12)} ${pad("Price", 14)} ${pad("24h", 10)} ${pad("Liquidity", 11)} ${pad("Vol 24h", 11)} ${pad("Age", 8)} Risk`);
+      for (const t of d) console.log(`${pad(bold(t.symbol), 12)} ${pad(price(t.priceUsd), 14)} ${pad(pct(t.changePct.h24), 10)} ${pad(usd(t.liquidityUsd), 11)} ${pad(usd(t.volumeUsd.h24), 11)} ${pad(t.poolAgeHours != null ? (t.poolAgeHours / 24).toFixed(1) + "d" : "–", 8)} ${riskColor(t.risk.level)}${t.risk.flags.length ? gray(" " + t.risk.flags.join(", ")) : ""}`);
+      console.log();
+    });
+  },
+
+  async radar() {
+    const type = rest[0];
+    await run("Reading Rug Radar…", "get_rug_radar", type ? { type } : {}, (d) => {
+      console.log(`\n${bold("Rug Radar")} ${gray(`· watching ${d.watchingPools} pools · since ${new Date(d.monitoringSince).toLocaleTimeString()}`)}\n`);
+      if (!d.events.length) console.log(gray("  No red-flag events since monitoring started."));
+      for (const e of d.events) console.log(`  ${e.severity === "high" ? red("●") : yellow("●")} ${bold(e.symbol)} ${e.title} ${gray(`— ${e.detail}`)}`);
+      console.log();
+    });
+  },
+
+  async smart() {
+    const sort = rest[0] ?? "pnl";
+    await run("Ranking smart money…", "get_smart_money", { sort }, (d) => {
+      console.log(`\n${bold("Smart money")} ${gray(`· last ~${d.windowHours}h · ${d.botsRemoved} bots removed · ${d.tokens.join(", ")}`)}\n`);
+      d.traders.forEach((t, i) => console.log(`  ${pad(String(i + 1), 3)} ${pad(short(t.wallet), 14)} ${pad(t.pnlUsd >= 0 ? green(`+${usd(t.pnlUsd)}`) : red(`−${usd(-t.pnlUsd)}`), 12)} ${gray(`vol ${usd(t.volumeUsd)} · ${t.trades} trades · win ${t.winRate}%`)}${t.automated ? " " + yellow("AUTOMATED") : ""}`));
+      console.log();
+    });
+  },
+
   async news() {
     const topic = rest.join(" ") || undefined;
     await run("Reading news…", "get_news", { topic }, (d) => {
@@ -267,7 +297,7 @@ const commands = {
 
   help() {
     console.log(`
-${bold("strix")} ${gray("— AI trading agent for Robinhood Chain (chain 4663)")}
+${bold("strix")} ${gray("— AI agent for Robinhood Chain (chain 4663)")}
 
 ${bold("Usage")}
   strix ask "<question>"            Ask the AI agent anything
@@ -280,6 +310,9 @@ ${bold("Usage")}
   strix stocks [ticker]             Stock tokens vs the real share price (premium/discount)
   strix wallet <0x…>                Wallet holdings, risk, spam filter and 24h trades
   strix search <name|symbol>        Find a token / pool
+  strix compare <A> <B> [C] [D]     Side-by-side: liquidity, volume, age, risk
+  strix radar [type]                Rug Radar: liquidity pulls, crashes, mints, copycats
+  strix smart [pnl|volume|trades]   Smart-money leaderboard (bots removed)
   strix news [topic]                Robinhood Chain headlines
 
 ${bold("Options")}

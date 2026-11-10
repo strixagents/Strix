@@ -1,4 +1,4 @@
-import { getNetworkStatus, getTopTokens, getTrending, risksFor, signalsFor } from "@/lib/rhchain";
+import { getNetworkStatus, getTopTokens, getTrending, risksFor, signalsFor, trusted } from "@/lib/rhchain";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -11,7 +11,9 @@ export async function GET() {
       getNetworkStatus().catch(() => null),
     ]);
     const tokens = top.slice(0, 40).map((t) => ({ ...t, signals: signalsFor(t), risk: risksFor(t) }));
-    const liquid = top.filter((t) => t.liquidity > 100_000);
+    // rankings and totals only count real tokens — copycats and fake liquidity would distort them
+    const real = top.filter(trusted);
+    const liquid = real.filter((t) => t.liquidity > 100_000);
     const byChange = [...liquid].sort((a, b) => b.change.h24 - a.change.h24);
     return Response.json({
       network,
@@ -20,8 +22,8 @@ export async function GET() {
       gainers: byChange.slice(0, 5),
       losers: byChange.slice(-5).reverse(),
       stats: {
-        volume24h: top.reduce((s, t) => s + t.volume.h24, 0),
-        liquidity: top.reduce((s, t) => s + t.liquidity, 0),
+        volume24h: real.reduce((s, t) => s + t.volume.h24, 0),
+        liquidity: real.reduce((s, t) => s + t.liquidity, 0),
         tokens: top.length,
       },
       updatedAt: Date.now(),

@@ -3,9 +3,12 @@ import { getNews } from "./news";
 import { analystReport } from "./analyst";
 import { getStockPremiums } from "./stocks";
 import { scanWallet } from "./wallet";
+import { getRadar } from "./radar";
+import { getSmartMoney } from "./smartmoney";
+import { isAddress } from "./evm";
 import {
   CHAIN, INTERVALS, RISKS, SIGNALS, getCandles, getNetworkStatus, getNewPools, getPool, getTopTokens, getTrending,
-  links, resolvePool, risksFor, searchTokens, signalsFor, type Interval, type SignalKey, type Token,
+  getPrices, links, resolvePool, risksFor, searchTokens, signalsFor, trusted, type Interval, type SignalKey, type Token,
 } from "./rhchain";
 
 export type AgentEvent =
@@ -13,13 +16,46 @@ export type AgentEvent =
   | { t: "step_done"; id: string; ok: boolean; summary: string }
   | { t: "focus"; pool: string; interval: Interval }
   | { t: "answer"; text: string }
+  | { t: "delta"; text: string }
+  | { t: "reset" }
+  | { t: "card"; card: Card }
+  | { t: "followups"; items: string[] }
+  | { t: "meta"; model: string; ms: number; tools: number }
+  | { t: "action"; action: AgentAction }
   | { t: "error"; message: string };
+
+/** Things the agent does for the user; applied in the browser (alerts, watchlist, followed wallets live there). */
+export type AgentAction =
+  | { kind: "alert"; pool: string; symbol: string; price: number; dir: "above" | "below" }
+  | { kind: "watch"; op: "add" | "remove"; pool: string; symbol: string }
+  | { kind: "follow"; op: "add" | "remove"; address: string; label: string };
+
+/** What the browser tells the agent about the user (no accounts — it all lives in their browser). */
+export type AgentCtx = {
+  viewing?: string;
+  web?: boolean;
+  watchlist?: { pool: string; symbol: string }[];
+  wallets?: { address: string; label: string }[];
+  alerts?: { pool: string; symbol: string; price: number; dir: "above" | "below" }[];
+};
+
+/** Structured live-data cards shown inside the chat next to the AI's text. */
+export type Card =
+  | { kind: "token"; symbol: string; name: string; image: string | null; pool: string; price: number; h1: number; h24: number; liquidity: number; volume24h: number; fdv: number | null; risk: string; flags: string[]; bias: string | null; rsi: number | null; interval: string; spark: number[] }
+  | { kind: "score"; symbol: string; pool: string; grade: string; score: number; verdict: string; checks: { label: string; status: string }[]; honeypot: string; holders: number | null }
+  | { kind: "whales"; symbol: string; pool: string; pressure: string; buysUsd: number; sellsUsd: number; wallets: number; wash: boolean; topWallet: string | null }
+  | { kind: "wallet"; address: string; valueUsd: number; tokens: number; trades: number; bot: boolean; top: { symbol: string; valueUsd: number }[] }
+  | { kind: "radar"; watching: number; events: { symbol: string; title: string; severity: string; pool: string }[] }
+  | { kind: "traders"; windowHours: number; top: { wallet: string; pnlUsd: number; volumeUsd: number; automated: boolean }[] }
+  | { kind: "action"; icon: string; text: string; href?: string }
+  | { kind: "watchlist"; items: { symbol: string; pool: string; price: number; h24: number; liquidity: number; risk: string }[]; alerts: { symbol: string; price: number; dir: string; distancePct: number | null }[]; wallets: number }
+  | { kind: "compare"; rows: { symbol: string; pool: string; price: number; h24: number; liquidity: number; volume24h: number; fdv: number | null; ageDays: number | null; risk: string; flags: string[] }[] };
 
 type Msg =
   | { role: "system" | "user"; content: string }
   | { role: "assistant"; content: string | null; tool_calls?: ToolCall[] }
   | { role: "tool"; tool_call_id: string; content: string };
-type ToolCall = { id: string; type: "function"; function: { name: string; arguments: string } };
+type ToolCall = { id: string; type: "function"; function: { name: string; arguments: string }; extra_content?: unknown };
 
 export const fmt = (n: number | null | undefined, d = 2) =>
   n == null || !isFinite(n)
@@ -52,7 +88,7 @@ export const TOOLS = [
     function: {
       name: "analyze_token",
       description:
-        "Full analysis of one Robinhood Chain token: live on-chain stats (price, % change, volume, liquidity, FDV, buys/sells, pool age), risk flags, and technical indicators from DEX candles (EMA20/50/200, RSI, MACD, ATR, Bollinger, swing support/resistance, ATR risk plan). Accepts a symbol (NVDA, CASHCAT, PONS, WETH), a token address or a pool address.",
+        "Full analysis of one Robinhood Chain token: live on-chain stats (price, % change, volume, liquidity, FDV, buys/sells, pool age), risk flags, and technical indicators from DEX candles (EMA20/50/200, RSI, MACD, ATR, Bollinger, swing support/resistance). Accepts a symbol (NVDA, CASHCAT, PONS, WETH), a token address or a pool address.",
       parameters: {
         type: "object",
         properties: {
@@ -146,12 +182,160 @@ export const TOOLS = [
       parameters: { type: "object", properties: { topic: { type: "string" } } },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "get_rug_radar",
+      description: "Live Rug Radar for Robinhood Chain: recent liquidity pulls, price crashes, sudden supply mints and copycat launches detected by Strix's background watcher. Use for 'any rugs?', 'what's dumping?', 'is anything sketchy right now?'.",
+      parameters: { type: "object", properties: { type: { type: "string", enum: ["liquidity_pull", "crash", "mint", "copycat"] } } },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_smart_money",
+      description: "Smart-money leaderboard: real wallets ranked by trading PnL on Robinhood Chain's most liquid tokens over the last ~24h (bots/relayers removed). Use for 'who is winning', 'top traders', 'smart money buying'.",
+      parameters: { type: "object", properties: { sort: { type: "string", enum: ["pnl", "volume", "trades"] } } },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "compare_tokens",
+      description: "Side-by-side comparison of 2–4 Robinhood Chain tokens: price, 24h change, liquidity, volume, FDV, pool age, risk level and flags. Use for 'X vs Y', 'compare', 'which is safer'.",
+      parameters: { type: "object", properties: { tokens: { type: "array", items: { type: "string" }, description: "2–4 symbols or addresses" } }, required: ["tokens"] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_my_watchlist",
+      description: "The user's own saved watchlist tokens (with live price, 24h change, liquidity, risk), their active price alerts (with distance to trigger) and followed wallets. Use for 'my tokens', 'my watchlist', 'my alerts', 'brief me', 'how are my coins'.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "set_price_alert",
+      description: "ACTION: create a price alert for the user (fires a sound + browser notification when price crosses the level). Give either an absolute USD price or a percent move from the current price (e.g. -10 for 'if it drops 10%'). Use when the user says 'alert me', 'notify me', 'kasih tau kalau'.",
+      parameters: { type: "object", properties: { token: { type: "string" }, price: { type: "number", description: "USD level" }, percent: { type: "number", description: "% move from now, negative = drop" } }, required: ["token"] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "manage_watchlist",
+      description: "ACTION: add a token to (or remove it from) the user's watchlist. Use for 'watch X', 'add X to my list', 'pantau X', 'remove X'.",
+      parameters: { type: "object", properties: { op: { type: "string", enum: ["add", "remove"] }, token: { type: "string" } }, required: ["op", "token"] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "follow_wallet",
+      description: "ACTION: follow (or unfollow) a wallet address so the user can track it from the Wallet page and their briefings.",
+      parameters: { type: "object", properties: { address: { type: "string" }, unfollow: { type: "boolean" }, label: { type: "string" } }, required: ["address"] },
+    },
+  },
 ] as const;
 
-type ToolResult = { data: unknown; summary: string; focus?: { pool: string; interval: Interval } };
+type ToolResult = { data: unknown; summary: string; focus?: { pool: string; interval: Interval }; card?: Card; action?: AgentAction };
 
-export async function runTool(name: string, args: Record<string, unknown>): Promise<ToolResult> {
+const WEB_ONLY = "Alerts, the watchlist and followed wallets live in the Strix web app (they are saved in the user's browser). Tell the user to ask this in the Strix web app.";
+
+export async function runTool(name: string, args: Record<string, unknown>, ctx: AgentCtx = {}): Promise<ToolResult> {
   switch (name) {
+    case "compare_tokens": {
+      const list = (Array.isArray(args.tokens) ? args.tokens : String(args.tokens ?? "").split(/[\s,]+/)).map(String).filter(Boolean).slice(0, 4);
+      if (list.length < 2) throw new Error("Give at least two tokens to compare");
+      const rows = await Promise.all(
+        list.map(async (q) => {
+          const t = await getPool(await resolvePool(q));
+          const r = risksFor(t);
+          return { t, r };
+        })
+      );
+      return {
+        data: rows.map(({ t }) => brief(t)),
+        summary: rows.map(({ t, r }) => `${t.symbol} ${r.level}`).join(" vs "),
+        card: {
+          kind: "compare",
+          rows: rows.map(({ t, r }) => ({
+            symbol: t.symbol, pool: t.pool, price: t.price, h24: t.change.h24, liquidity: t.liquidity, volume24h: t.volume.h24, fdv: t.fdv,
+            ageDays: t.ageHours != null ? +(t.ageHours / 24).toFixed(1) : null, risk: r.level, flags: r.flags.map((f) => RISKS[f].label),
+          })),
+        },
+      };
+    }
+    case "get_my_watchlist": {
+      if (!ctx.web) throw new Error(WEB_ONLY);
+      const watch = (ctx.watchlist ?? []).slice(0, 10);
+      const alerts = (ctx.alerts ?? []).slice(0, 15);
+      const tokens = (await Promise.all(watch.map((w) => getPool(w.pool).catch(() => null)))).filter((t): t is Token => !!t);
+      const alertPrices = alerts.length ? await getPrices([...new Set(alerts.map((a) => a.pool))]).catch(() => ({} as Record<string, number | null>)) : {};
+      const al = alerts.map((a) => {
+        const now = alertPrices[a.pool.toLowerCase()] ?? alertPrices[a.pool] ?? null;
+        return { symbol: a.symbol, alertPrice: a.price, direction: a.dir, currentPrice: now, distancePct: now ? +(((a.price - now) / now) * 100).toFixed(2) : null };
+      });
+      return {
+        data: {
+          watchlist: tokens.map(brief),
+          activeAlerts: al,
+          followedWallets: (ctx.wallets ?? []).slice(0, 10),
+          ...(watch.length || alerts.length || ctx.wallets?.length ? {} : { empty: "The user has no watchlist, alerts or followed wallets yet. Offer to add some (manage_watchlist / set_price_alert / follow_wallet)." }),
+        },
+        summary: `${tokens.length} watched · ${al.length} alerts · ${ctx.wallets?.length ?? 0} wallets`,
+        card: {
+          kind: "watchlist",
+          items: tokens.map((t) => ({ symbol: t.symbol, pool: t.pool, price: t.price, h24: t.change.h24, liquidity: t.liquidity, risk: risksFor(t).level })),
+          alerts: al.map((a) => ({ symbol: a.symbol, price: a.alertPrice, dir: a.direction, distancePct: a.distancePct })),
+          wallets: ctx.wallets?.length ?? 0,
+        },
+      };
+    }
+    case "set_price_alert": {
+      if (!ctx.web) throw new Error(WEB_ONLY);
+      const pool = await resolvePool(String(args.token));
+      const t = await getPool(pool);
+      if (!(t.price > 0)) throw new Error(`No live price for ${t.symbol}`);
+      const pct = args.percent != null && isFinite(Number(args.percent)) ? Number(args.percent) : null;
+      const level = Number(args.price) > 0 ? Number(args.price) : pct != null ? t.price * (1 + pct / 100) : NaN;
+      if (!(level > 0)) throw new Error("Give a price level or a percent move for the alert");
+      const dir = level >= t.price ? "above" : "below";
+      const move = ((level - t.price) / t.price) * 100;
+      return {
+        data: { done: true, symbol: t.symbol, pool, currentPrice: t.price, alertPrice: level, direction: dir, movePct: +move.toFixed(2), note: "Saved in the user's browser. It fires with a sound + notification while any Strix tab is open (checked every minute)." },
+        summary: `Alert set: ${t.symbol} ${dir === "above" ? "≥" : "≤"} $${fmt(level)} (${move >= 0 ? "+" : ""}${move.toFixed(1)}%)`,
+        action: { kind: "alert", pool, symbol: t.symbol, price: level, dir },
+        card: { kind: "action", icon: "🔔", text: `Alert set — ${t.symbol} ${dir} $${fmt(level)} (now $${fmt(t.price)}, ${move >= 0 ? "+" : ""}${move.toFixed(1)}%)`, href: `/app?pool=${pool}` },
+      };
+    }
+    case "manage_watchlist": {
+      if (!ctx.web) throw new Error(WEB_ONLY);
+      const op = args.op === "remove" ? "remove" : "add";
+      const pool = await resolvePool(String(args.token));
+      const t = await getPool(pool);
+      return {
+        data: { done: true, op, symbol: t.symbol, pool, priceUsd: t.price, risk: risksFor(t).level },
+        summary: `${op === "add" ? "Watching" : "Removed"} ${t.symbol}`,
+        action: { kind: "watch", op, pool, symbol: t.symbol },
+        card: { kind: "action", icon: op === "add" ? "⭐" : "✕", text: op === "add" ? `Added ${t.symbol} to your watchlist` : `Removed ${t.symbol} from your watchlist`, href: `/app?pool=${pool}` },
+      };
+    }
+    case "follow_wallet": {
+      if (!ctx.web) throw new Error(WEB_ONLY);
+      const address = String(args.address ?? "").trim();
+      if (!isAddress(address)) throw new Error("That is not a valid 0x wallet address");
+      const op = args.unfollow ? "remove" : "add";
+      const label = String(args.label || `${address.slice(0, 6)}…${address.slice(-4)}`).slice(0, 40);
+      return {
+        data: { done: true, op, address, label },
+        summary: `${op === "add" ? "Following" : "Unfollowed"} ${label}`,
+        action: { kind: "follow", op, address, label },
+        card: { kind: "action", icon: "👁", text: op === "add" ? `Following wallet ${label}` : `Unfollowed ${label}`, href: `/wallet?address=${address}` },
+      };
+    }
     case "analyze_token": {
       const interval = (INTERVALS.includes(args.interval as Interval) ? args.interval : "1h") as Interval;
       const pool = await resolvePool(String(args.token));
@@ -161,25 +345,31 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
         data: {
           chain: CHAIN.name, ...brief(t), links: links(t), interval,
           technical: ta
-            ? { bias: ta.bias, score: ta.score, reasons: ta.reasons, price: ta.price, ema20: ta.ema20, ema50: ta.ema50, ema200: ta.ema200, rsi: ta.rsi, macdHist: ta.macd.hist, atr: ta.atr, atrPct: ta.atrPct, bollinger: ta.bollinger, support: ta.support.map((s) => s.price), resistance: ta.resistance.map((s) => s.price), riskPlan: ta.riskPlan }
+            ? { bias: ta.bias, score: ta.score, reasons: ta.reasons, price: ta.price, ema20: ta.ema20, ema50: ta.ema50, ema200: ta.ema200, rsi: ta.rsi, macdHist: ta.macd.hist, atr: ta.atr, atrPct: ta.atrPct, bollinger: ta.bollinger, support: ta.support.map((s) => s.price), resistance: ta.resistance.map((s) => s.price) }
             : "Not enough candle history yet (new pool) or candle feed busy — rely on on-chain stats.",
         },
-        summary: `${t.symbol} $${fmt(t.price)} · 24h ${fmt(t.change.h24)}% · liq ${usd(t.liquidity)}${ta ? ` · RSI ${fmt(ta.rsi, 1)} · ${ta.bias}` : ""}`,
+        summary: `${t.symbol} ${fmt(t.price)} · 24h ${fmt(t.change.h24)}% · liq ${usd(t.liquidity)}${ta ? ` · RSI ${fmt(ta.rsi, 1)} · ${ta.bias}` : ""}`,
         focus: { pool, interval },
+        card: {
+          kind: "token", symbol: t.symbol, name: t.name, image: t.image, pool, price: t.price, h1: t.change.h1, h24: t.change.h24, liquidity: t.liquidity,
+          volume24h: t.volume.h24, fdv: t.fdv, risk: risksFor(t).level, flags: risksFor(t).flags.map((f) => RISKS[f].label), bias: ta?.bias ?? null,
+          rsi: ta?.rsi ?? null, interval, spark: (candles ?? []).slice(-48).map((c) => c.close),
+        },
       };
     }
     case "get_chain_overview": {
       const [top, trending, net] = await Promise.all([getTopTokens(), getTrending().catch(() => []), getNetworkStatus().catch(() => null)]);
-      const liquid = top.filter((t) => t.liquidity > 100_000);
+      const real = top.filter(trusted);
+      const liquid = real.filter((t) => t.liquidity > 100_000);
       const byChg = [...liquid].sort((a, b) => b.change.h24 - a.change.h24);
       const line = (t: Token) => ({ symbol: t.symbol, priceUsd: t.price, change24h: t.change.h24, volume24h: Math.round(t.volume.h24), liquidity: Math.round(t.liquidity) });
       return {
         data: {
-          network: net, totalVolume24h: Math.round(top.reduce((s, t) => s + t.volume.h24, 0)),
-          topByVolume: top.slice(0, 10).map(line), gainers: byChg.slice(0, 5).map(line), losers: byChg.slice(-5).reverse().map(line),
+          network: net, totalVolume24h: Math.round(real.reduce((s, t) => s + t.volume.h24, 0)),
+          topByVolume: real.slice(0, 10).map(line), excludedCopycats: top.length - real.length, gainers: byChg.slice(0, 5).map(line), losers: byChg.slice(-5).reverse().map(line),
           trending: trending.slice(0, 8).map(line),
         },
-        summary: `${top.length} tokens · vol ${usd(top.reduce((s, t) => s + t.volume.h24, 0))}${net ? ` · block ${net.block.toLocaleString()}` : ""}`,
+        summary: `${real.length} tokens · vol ${usd(real.reduce((s, t) => s + t.volume.h24, 0))}${net ? ` · block ${net.block.toLocaleString()}` : ""}`,
       };
     }
     case "scan_tokens": {
@@ -215,6 +405,10 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
         },
         summary: `${r.token.symbol}: ${r.scorecard.grade} (${r.scorecard.score}/100) · ${r.scorecard.verdict}`,
         focus: { pool, interval: "1h" },
+        card: {
+          kind: "score", symbol: r.token.symbol, pool, grade: r.scorecard.grade, score: r.scorecard.score, verdict: r.scorecard.verdict,
+          checks: r.scorecard.checks.map((c) => ({ label: c.label, status: c.status })), honeypot: String(r.info?.honeypot ?? "unknown"), holders: r.info?.holders?.count ?? null,
+        },
       };
     }
     case "get_whale_activity": {
@@ -233,6 +427,9 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
           },
           largeTransfers: r.transfers.slice(0, 8).map((t) => ({ kind: t.kind, usd: Math.round(t.usd), from: t.from, to: t.to })),
         },
+        card: w
+          ? { kind: "whales", symbol: r.token.symbol, pool, pressure: w.pressure, buysUsd: w.buysUsd, sellsUsd: w.sellsUsd, wallets: w.wallets, wash: w.washSuspect, topWallet: w.topAccumulators[0]?.wallet ?? null }
+          : undefined,
         summary: w ? `${r.token.symbol}: ${w.pressure} · +$${Math.round(w.buysUsd).toLocaleString("en-US")} / −$${Math.round(w.sellsUsd).toLocaleString("en-US")}${w.washSuspect ? " · wash suspect" : ""}` : "no whale data",
         focus: { pool, interval: "1h" },
       };
@@ -266,12 +463,41 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
           holdings: s.holdings.filter((h) => !h.spam).slice(0, 15).map((h) => ({ symbol: h.symbol, balance: h.balance, valueUsd: h.value && Math.round(h.value), risk: h.risk?.level ?? null, flags: h.risk?.flags ?? [] })),
           last24h: { swaps: s.activity.swaps, netFlowsUsd: s.activity.netFlows.slice(0, 10).map((f) => ({ symbol: f.symbol, netUsd: Math.round(f.netUsd), boughtUsd: Math.round(f.inUsd), soldUsd: Math.round(f.outUsd) })) },
         },
+        card: {
+          kind: "wallet", address: s.address, valueUsd: s.totalValue, tokens: s.holdings.filter((h) => !h.spam).length, trades: s.activity.swaps, bot: s.isBot,
+          top: s.holdings.filter((h) => !h.spam && h.value).slice(0, 4).map((h) => ({ symbol: h.symbol, valueUsd: h.value ?? 0 })),
+        },
         summary: `${s.address.slice(0, 8)}…: ${usd(s.totalValue)} · ${s.holdings.filter((h) => !h.spam).length} tokens · ${s.activity.swaps} trades 24h${s.isBot ? " · BOT" : ""}`,
       };
     }
     case "get_news": {
       const n = await getNews(args.topic ? String(args.topic) : undefined, 8);
       return { data: n.map(({ title, date, source }) => ({ title, date, source })), summary: `${n.length} headlines` };
+    }
+    case "get_rug_radar": {
+      const r = await getRadar();
+      const ev = r.events.filter((e) => !args.type || e.type === args.type).slice(0, 12);
+      return {
+        data: {
+          watchingPools: r.watching, monitoringSince: new Date(r.monitoringSince).toISOString(), lastScan: r.lastScan ? new Date(r.lastScan).toISOString() : null,
+          events: ev.map((e) => ({ type: e.type, severity: e.severity, symbol: e.symbol, token: e.token, title: e.title, detail: e.detail, at: new Date(e.at).toISOString() })),
+        },
+        card: { kind: "radar", watching: r.watching, events: ev.slice(0, 4).map((e) => ({ symbol: e.symbol, title: e.title, severity: e.severity, pool: e.pool })) },
+        summary: `${ev.length} radar events · watching ${r.watching} pools`,
+      };
+    }
+    case "get_smart_money": {
+      const s = await getSmartMoney();
+      const key = args.sort === "volume" ? "volumeUsd" : args.sort === "trades" ? "trades" : "pnlUsd";
+      const top = [...s.traders].sort((a, b) => b[key] - a[key]).slice(0, 10);
+      return {
+        data: {
+          windowHours: s.windowHours, botsRemoved: s.botsRemoved, tokens: s.pools.map((p) => p.symbol),
+          traders: top.map((t) => ({ wallet: t.wallet, pnlUsd: Math.round(t.pnlUsd), volumeUsd: Math.round(t.volumeUsd), trades: t.trades, winRate: Math.round(t.winRate * 100), automated: t.automated, positions: t.positions.slice(0, 4).map((p) => `${p.symbol} ${Math.round(p.pnlUsd)}`) })),
+        },
+        card: { kind: "traders", windowHours: s.windowHours, top: top.slice(0, 5).map((t) => ({ wallet: t.wallet, pnlUsd: t.pnlUsd, volumeUsd: t.volumeUsd, automated: t.automated })) },
+        summary: `${s.traders.length} wallets ranked · ${s.botsRemoved} bots removed`,
+      };
     }
     default:
       throw new Error(`Unknown tool ${name}`);
@@ -288,27 +514,39 @@ const LABELS: Record<string, (a: Record<string, unknown>) => string> = {
   get_token_scorecard: (a) => `Running safety scorecard on ${a.token} (holders, honeypot, dev wallet…)`,
   get_whale_activity: (a) => `Tracking whale wallets & large trades on ${a.token}`,
   get_stock_premiums: (a) => `Comparing ${a.ticker ?? "stock"} tokens with the real share price`,
+  get_rug_radar: () => "Checking the Rug Radar (liquidity pulls, crashes, mints, copycats)",
+  get_smart_money: () => "Ranking smart-money wallets (bots removed)",
+  compare_tokens: (a) => `Comparing ${(Array.isArray(a.tokens) ? a.tokens : [a.tokens]).join(" vs ")}`,
+  get_my_watchlist: () => "Reading your watchlist, alerts and followed wallets",
+  set_price_alert: (a) => `Setting a price alert on ${a.token}`,
+  manage_watchlist: (a) => `${a.op === "remove" ? "Removing" : "Adding"} ${a.token} ${a.op === "remove" ? "from" : "to"} your watchlist`,
+  follow_wallet: (a) => `${a.unfollow ? "Unfollowing" : "Following"} wallet ${String(a.address).slice(0, 8)}…`,
   scan_wallet: (a) => `Scanning wallet ${String(a.address).slice(0, 8)}… holdings & 24h trades`,
 };
 
 /* ───────────── LLM loop ───────────── */
 
-const SYSTEM = `You are Strix, an honest AI trading research agent specialised in Robinhood Chain (Arbitrum Orbit L2, chain ID ${CHAIN.id}, gas in ETH).
+const SYSTEM = `You are Strix, an honest on-chain AI agent and analyst specialised in Robinhood Chain (Arbitrum Orbit L2, chain ID ${CHAIN.id}, gas in ETH).
 Tokens there include memecoins, launchpad tokens, and tokenized stocks (e.g. NVDA, TSLA) quoted in WETH or USDG.
 Today is ${new Date().toISOString().slice(0, 10)}.
 Rules:
 - ALWAYS call tools before giving any number. Never invent prices, levels, liquidity or addresses.
 - Token question → analyze_token (1h by default; add 4h/1d for swing context). Market question → get_chain_overview. Discovery → scan_tokens / get_new_launches.
-- Never tell the user what to buy or sell and never label a scenario as "recommended" / "rekomendasi". Present bullish and bearish scenarios neutrally with their triggers; the user decides.
+- You are a research agent, not a trading bot. Never tell the user what to buy or sell, never give entry / stop-loss / take-profit prices, position sizes or "long/short" setups, and never call anything "recommended" / "rekomendasi". If asked for a trade plan, say you only research and explain on-chain data and risk.
 - Safety questions ("aman ga?", rug, holder, trust) → get_token_scorecard. Whale / smart-money questions → get_whale_activity. For a full token review, call analyze_token AND get_token_scorecard.
 - Stock tokens vs real shares → get_stock_premiums. A wallet address (0x + 40 hex) → scan_wallet. If a wallet looksLikeBot, say it is a bot/relayer and should not be copied.
+- You can ACT for the user: set_price_alert ("alert me if…", "kasih tau kalau…"), manage_watchlist ("watch X", "pantau X"), follow_wallet. Do it when asked, then confirm in one line what was set. Percent requests ("if it drops 10%") → pass percent: -10.
+- "My tokens / my watchlist / my alerts / brief me" → get_my_watchlist (then add get_rug_radar for a briefing and warn if any watched token appears there or is High risk).
+- Comparing 2–4 tokens → compare_tokens (one call), then explain the differences in a table.
+- Rugs / dumps / "anything sketchy right now" → get_rug_radar. Top traders / who is winning → get_smart_money (mention automated wallets and that a short window is noisy).
 - If whales.washSuspect is true, say clearly that the volume is likely fake (one wallet trading with itself).
 - If a token has the "Possible copycat" flag, say so loudly: another older token uses the same symbol; tell the user to verify the contract address (copycatOf is the original).
 - On-chain risk matters as much as the chart: always mention liquidity, FDV vs liquidity, pool age, buy/sell balance and the risk level. Warn clearly on High risk (possible rug, thin liquidity, heavy slippage).
 - ALWAYS reply in English, even if the user writes in another language.
-- Markdown, concise: **Summary**, **On-chain** (liq, FDV, volume, buys/sells, age), **Technicals** (if candles available), **Levels & scenarios** (bull/bear with entry, stop, targets from the ATR risk plan), **Risks**.
-- Use tables when comparing tokens.
-- End with a short reminder: not financial advice; size small on new/low-liquidity tokens.`;
+- Markdown, concise: **Summary**, **On-chain** (liq, FDV, volume, buys/sells, age), **Chart context** (trend, RSI, key support/resistance zones — descriptive only), **Risks**, **What to watch** (on-chain signals worth monitoring).
+- Use tables when comparing tokens. For broad questions, chain several tools (e.g. overview → scorecard on the most interesting token) before answering.
+- The UI already shows live data cards for each tool (price, grade, whales, wallet). Don't repeat every raw number — interpret them: what matters, what is unusual, what to watch next.
+- End with a short reminder: research only, not financial advice.`;
 
 type LLM = { name: string; key: string; base: string; model: string };
 
@@ -341,12 +579,12 @@ const compact = (data: unknown) =>
  * Try each provider in order. A rate-limited primary hands over to the backup immediately
  * (no waiting); only the last provider waits out a short 429 before giving up.
  */
-async function chatAny(providers: LLM[], messages: Msg[], onWait: (s: number) => void, onSwitch: (to: string) => void) {
+async function chatAny(providers: LLM[], messages: Msg[], onWait: (s: number) => void, onSwitch: (to: string) => void, onDelta: (t: string) => void) {
   let lastErr: Error | null = null;
   for (let i = 0; i < providers.length; i++) {
     const isLast = i === providers.length - 1;
     try {
-      return await chat(providers[i], messages, isLast ? onWait : null);
+      return { ...(await chat(providers[i], messages, isLast ? onWait : null, onDelta)), model: providers[i].name };
     } catch (e) {
       lastErr = e as Error;
       if (!isLast) onSwitch(providers[i + 1].name);
@@ -355,13 +593,13 @@ async function chatAny(providers: LLM[], messages: Msg[], onWait: (s: number) =>
   throw lastErr ?? new Error("No AI provider configured");
 }
 
-async function chat(cfg: LLM, messages: Msg[], onWait: ((s: number) => void) | null) {
+async function chat(cfg: LLM, messages: Msg[], onWait: ((s: number) => void) | null, onDelta: (t: string) => void) {
   for (let attempt = 0; ; attempt++) {
     const res = await fetch(`${cfg.base}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${cfg.key}` },
-      body: JSON.stringify({ model: cfg.model, messages, tools: TOOLS, tool_choice: "auto", temperature: 0.3 }),
-      signal: AbortSignal.timeout(60_000),
+      body: JSON.stringify({ model: cfg.model, messages, tools: TOOLS, tool_choice: "auto", temperature: 0.3, stream: true }),
+      signal: AbortSignal.timeout(90_000),
     });
     if (res.status === 429 && attempt === 0) {
       // free tier per-minute token limit: wait as told (max 25s) and retry once
@@ -375,21 +613,120 @@ async function chat(cfg: LLM, messages: Msg[], onWait: ((s: number) => void) | n
       throw new Error(`LLM 429: ${body.slice(0, 200)}`);
     }
     if (!res.ok) throw new Error(`LLM ${res.status}: ${(await res.text()).slice(0, 300)}`);
-    const d = await res.json();
-    return d.choices[0].message as { content: string | null; tool_calls?: ToolCall[] };
+    if (!(res.headers.get("content-type") ?? "").includes("event-stream") || !res.body) {
+      const d = await res.json();
+      return d.choices[0].message as { content: string | null; tool_calls?: ToolCall[] };
+    }
+    return readStream(res.body, onDelta);
   }
 }
 
-export async function runAgent(history: { role: "user" | "assistant"; content: string }[], emit: (e: AgentEvent) => void) {
+/** Parse an OpenAI-style SSE stream: forward text as it arrives, assemble tool calls. */
+async function readStream(body: ReadableStream<Uint8Array>, onDelta: (t: string) => void) {
+  const reader = body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  let content = "";
+  const calls: ToolCall[] = [];
+  type TC = { index?: number; id?: string; function?: { name?: string; arguments?: string }; extra_content?: unknown };
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let nl: number;
+    while ((nl = buf.indexOf("\n")) >= 0) {
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      if (!line.startsWith("data:")) continue;
+      const payload = line.slice(5).trim();
+      if (!payload || payload === "[DONE]") continue;
+      let j: { choices?: { delta?: { content?: string | null; tool_calls?: TC[] } }[]; error?: { message?: string } };
+      try { j = JSON.parse(payload); } catch { continue; }
+      if (j.error) throw new Error(`LLM stream: ${j.error.message ?? "error"}`);
+      const d = j.choices?.[0]?.delta;
+      if (!d) continue;
+      for (const tc of d.tool_calls ?? []) {
+        let slot = tc.index != null ? calls[tc.index] : tc.id ? undefined : calls.at(-1);
+        if (!slot) {
+          slot = { id: tc.id || `call_${calls.length}_${Date.now()}`, type: "function", function: { name: "", arguments: "" } };
+          if (tc.index != null) calls[tc.index] = slot;
+          else calls.push(slot);
+        }
+        if (tc.id) slot.id = tc.id;
+        if (tc.function?.name) slot.function.name += tc.function.name;
+        if (tc.function?.arguments) slot.function.arguments += tc.function.arguments;
+        if (tc.extra_content) slot.extra_content = tc.extra_content;
+      }
+      if (typeof d.content === "string" && d.content) {
+        content += d.content;
+        if (!calls.length) onDelta(d.content);
+      }
+    }
+  }
+  const tool_calls = calls.filter(Boolean);
+  return { content: content || null, tool_calls: tool_calls.length ? tool_calls : undefined };
+}
+
+/** Suggested next questions, derived from what the agent actually looked at. */
+function followups(names: string[], cards: Card[]) {
+  const out: string[] = [];
+  const has = (n: string) => names.includes(n);
+  const tok = [...cards].reverse().find((c) => c.kind === "token" || c.kind === "score" || c.kind === "whales") as { symbol: string } | undefined;
+  const sym = tok?.symbol;
+  if (sym) {
+    if (!has("get_token_scorecard")) out.push(`Is ${sym} safe? Run the full scorecard`);
+    if (!has("get_whale_activity")) out.push(`Are whales buying or selling ${sym}?`);
+    if (!names.filter((n) => n === "analyze_token").length) out.push(`Analyze ${sym}: trend, liquidity and key levels`);
+    else out.push(`${sym} on the 4h chart — bigger picture`);
+  }
+  const whale = cards.find((c) => c.kind === "whales") as Extract<Card, { kind: "whales" }> | undefined;
+  if (whale?.topWallet) out.push(`Scan wallet ${whale.topWallet}`);
+  const tr = cards.find((c) => c.kind === "traders") as Extract<Card, { kind: "traders" }> | undefined;
+  if (tr?.top[0]) out.push(`Scan wallet ${tr.top[0].wallet}`);
+  const w = cards.find((c) => c.kind === "wallet") as Extract<Card, { kind: "wallet" }> | undefined;
+  if (w?.top.find((x) => !/^(ETH|WETH|USDG|USDC)$/.test(x.symbol))) out.push(`Is ${w.top.find((x) => !/^(ETH|WETH|USDG|USDC)$/.test(x.symbol))!.symbol} safe?`);
+  if (sym && !has("manage_watchlist") && !has("set_price_alert")) out.splice(1, 0, `Watch ${sym} and alert me if it drops 10%`);
+  const cmp = cards.find((c) => c.kind === "compare") as Extract<Card, { kind: "compare" }> | undefined;
+  if (cmp) out.push(...cmp.rows.slice(0, 2).map((r) => `Is ${r.symbol} safe? Run the full scorecard`));
+  if (!has("get_rug_radar")) out.push("Any rugs or copycats on the radar right now?");
+  if (!has("get_smart_money")) out.push("Who are the top traders today (bots removed)?");
+  if (!has("get_chain_overview")) out.push("How is Robinhood Chain doing today?");
+  return [...new Set(out)].slice(0, 3);
+}
+
+export async function runAgent(history: { role: "user" | "assistant"; content: string }[], emit: (e: AgentEvent) => void, ctx: AgentCtx = {}) {
+  const t0 = Date.now();
+  const names: string[] = [];
+  const cards: Card[] = [];
+  const em = (e: AgentEvent) => {
+    if (e.t === "step" && e.name !== "wait" && e.name !== "switch") names.push(e.name);
+    if (e.t === "card") cards.push(e.card);
+    emit(e);
+  };
+  const model = await agentLoop(history, em, ctx);
+  emit({ t: "followups", items: followups(names, cards) });
+  emit({ t: "meta", model, ms: Date.now() - t0, tools: names.length });
+}
+
+async function agentLoop(history: { role: "user" | "assistant"; content: string }[], emit: (e: AgentEvent) => void, ctx: AgentCtx): Promise<string> {
   let providers = llmProviders();
-  if (!providers.length) return runFallback(history.at(-1)?.content ?? "", emit, "nokey");
+  if (!providers.length) {
+    await runFallback(history.at(-1)?.content ?? "", emit, "nokey");
+    return "rule-based";
+  }
 
   // keep earlier answers short in the context so we stay within the free token budget
   const trimmed = history.slice(-8).map((m, i, arr) => (m.role === "assistant" && i < arr.length - 1 ? { ...m, content: m.content.slice(0, 1200) } : m));
-  const messages: Msg[] = [{ role: "system", content: SYSTEM }, ...trimmed];
+  const viewing = ctx.viewing ? `\nThe user currently has ${ctx.viewing} open on the chart: "this token", "it" or "ini" means ${ctx.viewing} unless they name another.` : "";
+  const messages: Msg[] = [{ role: "system", content: SYSTEM + viewing }, ...trimmed];
   let stepN = 0;
   let waitN = 0;
-  for (let iter = 0; iter < 6; iter++) {
+  let streamed = false;
+  const onDelta = (text: string) => {
+    streamed = true;
+    emit({ t: "delta", text });
+  };
+  for (let iter = 0; iter < 7; iter++) {
     let msg;
     try {
       msg = await chatAny(
@@ -404,39 +741,53 @@ export async function runAgent(history: { role: "user" | "assistant"; content: s
           const id = `w${waitN++}`;
           emit({ t: "step", id, name: "switch", label: `Primary AI is busy — switching to ${to}` });
           emit({ t: "step_done", id, ok: true, summary: `using ${to}` });
+          if (streamed) emit({ t: "reset" });
+          streamed = false;
           // keep using the backup for the rest of this answer
           providers = providers.slice(Math.max(0, providers.findIndex((p) => p.name === to)));
-        }
+        },
+        onDelta
       );
     } catch (e) {
+      if (streamed) emit({ t: "reset" });
       emit({ t: "error", message: (e as Error).message });
-      return runFallback(history.at(-1)?.content ?? "", emit, "busy");
+      await runFallback(history.at(-1)?.content ?? "", emit, "busy");
+      return "rule-based";
     }
     if (!msg.tool_calls?.length) {
       emit({ t: "answer", text: msg.content || "…" });
-      return;
+      return msg.model;
     }
+    if (streamed) emit({ t: "reset" });
+    streamed = false;
     messages.push({ role: "assistant", content: msg.content ?? null, tool_calls: msg.tool_calls });
-    // sequential: data provider is rate-limited
-    for (const tc of msg.tool_calls) {
+    // all tool calls of one step run in parallel (the data clients queue/rate-limit themselves)
+    const calls = msg.tool_calls.map((tc) => {
       const id = `s${stepN++}`;
       let args: Record<string, unknown> = {};
       try { args = JSON.parse(tc.function.arguments || "{}"); } catch {}
       emit({ t: "step", id, name: tc.function.name, label: (LABELS[tc.function.name] ?? (() => tc.function.name))(args) });
-      let content: string;
-      try {
-        const r = await runTool(tc.function.name, args);
-        if (r.focus) emit({ t: "focus", ...r.focus });
-        emit({ t: "step_done", id, ok: true, summary: r.summary });
-        content = compact(r.data);
-      } catch (e) {
-        emit({ t: "step_done", id, ok: false, summary: (e as Error).message });
-        content = JSON.stringify({ error: (e as Error).message });
-      }
-      messages.push({ role: "tool", tool_call_id: tc.id, content });
-    }
+      return { tc, id, args };
+    });
+    const results = await Promise.all(
+      calls.map(async ({ tc, id, args }) => {
+        try {
+          const r = await runTool(tc.function.name, args, ctx);
+          if (r.focus) emit({ t: "focus", ...r.focus });
+          emit({ t: "step_done", id, ok: true, summary: r.summary });
+          if (r.card) emit({ t: "card", card: r.card });
+          if (r.action) emit({ t: "action", action: r.action });
+          return compact(r.data);
+        } catch (e) {
+          emit({ t: "step_done", id, ok: false, summary: (e as Error).message });
+          return JSON.stringify({ error: (e as Error).message });
+        }
+      })
+    );
+    calls.forEach(({ tc }, i) => messages.push({ role: "tool", tool_call_id: tc.id, content: results[i] }));
   }
   emit({ t: "answer", text: "I hit my step limit — try a more specific question." });
+  return providers[0]?.name ?? "AI";
 }
 
 /* ───────────── no-LLM fallback: rule-based reports from real data ───────────── */
@@ -447,6 +798,7 @@ async function step(id: string, name: string, args: Record<string, unknown>, emi
     const r = await runTool(name, args);
     if (r.focus) emit({ t: "focus", ...r.focus });
     emit({ t: "step_done", id, ok: true, summary: r.summary });
+    if (r.card) emit({ t: "card", card: r.card });
     return r;
   } catch (e) {
     emit({ t: "step_done", id, ok: false, summary: (e as Error).message });
@@ -459,7 +811,7 @@ const NOTES = {
   nokey: "> ⚙️ *Rule-based mode — set `LLM_API_KEY` for full AI reasoning.*",
   busy: "> ⏳ *The free AI tier is busy right now — here is the rule-based report from the same live data. Ask again in a minute for the full AI answer.*",
 };
-const END = "*Not financial advice. Size small on new or thin-liquidity tokens.*";
+const END = "*Research only — not financial advice.*";
 type Brief = ReturnType<typeof brief>;
 const row = (b: Brief) =>
   `| **${b.symbol}** | $${fmt(b.priceUsd)} | ${fmt(b.changePct.h1)}% | ${fmt(b.changePct.h24)}% | ${usd(b.volumeUsd.h24)} | ${usd(b.liquidityUsd)} | ${b.risk.level} | ${b.signals.join(", ") || "–"} |`;
@@ -564,7 +916,7 @@ ${ta ? `**Technical (1h):** RSI ${fmt(ta.rsi, 1)} · MACD hist ${fmt(ta.macd.his
 **Support:** ${lv(ta.support)}
 **Resistance:** ${lv(ta.resistance)}
 
-**ATR plan** — long: stop ${fmt(ta.riskPlan?.long.stop)}, TP1 ${fmt(ta.riskPlan?.long.tp1)}, TP2 ${fmt(ta.riskPlan?.long.tp2)} · short: stop ${fmt(ta.riskPlan?.short.stop)}, TP1 ${fmt(ta.riskPlan?.short.tp1)}` : "_Not enough candle history for technicals yet._"}
+_Support/resistance are descriptive zones from past swings, not trade signals._` : "_Not enough candle history for technicals yet._"}
 
 [Explorer](${d.links.explorer}) · [GeckoTerminal](${d.links.geckoterminal}) · [DexScreener](${d.links.dexscreener})
 

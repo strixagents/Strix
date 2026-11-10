@@ -1,11 +1,28 @@
-import { runAgent, llmEnabled, type AgentEvent } from "@/lib/agent";
+import { TOOLS, runAgent, llmEnabled, type AgentCtx, type AgentEvent } from "@/lib/agent";
+
+const ADDR = /^0x[0-9a-fA-F]{40,64}$/;
+const clean = (s: unknown, n = 30) => (typeof s === "string" ? s.replace(/[^\w.$ -]/g, "").slice(0, n) : "");
+/** The browser sends the user's own watchlist / wallets / alerts — validate and cap everything. */
+function readCtx(body: Record<string, unknown>): AgentCtx {
+  const arr = (v: unknown) => (Array.isArray(v) ? v : []);
+  return {
+    viewing: clean(body.viewing) || undefined,
+    web: body.client === "web",
+    watchlist: arr(body.watchlist).filter((w) => ADDR.test(w?.pool)).slice(0, 10).map((w) => ({ pool: w.pool, symbol: clean(w.symbol, 20) })),
+    wallets: arr(body.wallets).filter((w) => /^0x[0-9a-fA-F]{40}$/.test(w?.address)).slice(0, 10).map((w) => ({ address: w.address, label: clean(w.label, 40) })),
+    alerts: arr(body.alerts)
+      .filter((a) => ADDR.test(a?.pool) && Number(a?.price) > 0)
+      .slice(0, 15)
+      .map((a) => ({ pool: a.pool, symbol: clean(a.symbol, 20), price: Number(a.price), dir: a.dir === "above" ? "above" : "below" })),
+  };
+}
 import { rateLimit } from "@/lib/cache";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function GET() {
-  return Response.json({ llm: llmEnabled() });
+  return Response.json({ llm: llmEnabled(), tools: TOOLS.length });
 }
 
 export async function POST(req: Request) {
@@ -14,7 +31,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "Too many requests — try again in a few minutes." }, { status: 429 });
   }
 
-  let body: { messages?: { role: string; content: string }[] };
+  let body: { messages?: { role: string; content: string }[] } & Record<string, unknown>;
   try {
     body = await req.json();
   } catch {
@@ -42,7 +59,7 @@ export async function POST(req: Request) {
         }
       };
       try {
-        await runAgent(history, emit);
+        await runAgent(history, emit, readCtx(body));
       } catch (e) {
         emit({ t: "error", message: (e as Error).message });
       } finally {

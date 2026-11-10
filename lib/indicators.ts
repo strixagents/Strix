@@ -181,13 +181,5 @@ export function analyze(c: Candle[]) {
     score,
     bias,
     reasons,
-    // ATR-based risk framework (not advice): 1.5 ATR stop, 2R / 3R targets
-    riskPlan:
-      atrNow != null
-        ? {
-            long: { stop: price - 1.5 * atrNow, tp1: price + 3 * atrNow, tp2: price + 4.5 * atrNow },
-            short: { stop: price + 1.5 * atrNow, tp1: price - 3 * atrNow, tp2: price - 4.5 * atrNow },
-          }
-        : null,
   };
 }

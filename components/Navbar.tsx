@@ -5,11 +5,13 @@ import { useEffect, useState } from "react";
 import { Logo } from "./Logo";
 
 const links = [
-  { href: "/app", label: "Terminal" },
+  { href: "/agent", label: "Agent" },
+  { href: "/app", label: "Analyst" },
   { href: "/screener", label: "Screener" },
   { href: "/stocks", label: "Stocks" },
   { href: "/wallet", label: "Wallet" },
-  { href: "/#faq", label: "FAQ" },
+  { href: "/smart-money", label: "Smart money" },
+  { href: "/radar", label: "Rug Radar" },
 ];
 
 export function Navbar() {
@@ -35,7 +37,7 @@ export function Navbar() {
           <span className="text-xl font-medium tracking-tight sm:text-2xl">Strix</span>
         </Link>
 
-        <ul className="hidden items-center gap-8 text-[15px] text-muted lg:flex">
+        <ul className="hidden items-center gap-7 text-[15px] text-muted xl:flex">
           {links.map((l) => (
             <li key={l.href}>
               <Link href={l.href} className="transition-colors hover:text-white">
@@ -46,14 +48,14 @@ export function Navbar() {
         </ul>
 
         <div className="flex items-center gap-2.5">
-          <Link href="/screener" className="btn-secondary hidden px-4 py-2 text-[15px] sm:inline-flex">
-            Screener
+          <Link href="/app" className="btn-secondary hidden px-4 py-2 text-[15px] sm:inline-flex">
+            Analyst
           </Link>
-          <Link href="/app" className="btn-primary px-3.5 py-1.5 text-sm sm:px-4 sm:py-2 sm:text-[15px]">
-            Open terminal <span aria-hidden>→</span>
+          <Link href="/agent" className="btn-primary px-3.5 py-1.5 text-sm sm:px-4 sm:py-2 sm:text-[15px]">
+            Open agent <span aria-hidden>→</span>
           </Link>
           <button
-            className="ml-1 p-2 text-white lg:hidden"
+            className="ml-1 p-2 text-white xl:hidden"
             aria-label="Toggle menu"
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
@@ -66,7 +68,7 @@ export function Navbar() {
       </nav>
 
       {open && (
-        <div className="mx-auto mt-2 max-w-6xl rounded-2xl border border-[#2a2a2a] bg-[#0f0f0f]/95 p-3 backdrop-blur-xl lg:hidden">
+        <div className="mx-auto mt-2 max-w-6xl rounded-2xl border border-[#2a2a2a] bg-[#0f0f0f]/95 p-3 backdrop-blur-xl xl:hidden">
           {links.map((l) => (
             <Link
               key={l.href}

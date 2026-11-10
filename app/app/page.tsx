@@ -3,12 +3,12 @@ import { Suspense } from "react";
 import { Terminal } from "@/components/terminal/Terminal";
 
 export const metadata: Metadata = {
-  title: "Strix Terminal — live charts & AI trading analyst",
+  title: "Strix Analyst — live charts, safety checks & the AI agent",
 };
 
 export default function AppPage() {
   return (
-    <Suspense fallback={<div className="grid h-dvh place-items-center text-muted">Loading terminal…</div>}>
+    <Suspense fallback={<div className="grid h-dvh place-items-center text-muted">Loading analyst…</div>}>
       <Terminal />
     </Suspense>
   );

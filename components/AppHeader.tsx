@@ -7,10 +7,13 @@ import { NetworkBadge } from "./market-ui";
 import { WalletButton } from "./WalletButton";
 
 export const APP_NAV = [
-  { href: "/app", label: "Terminal" },
+  { href: "/agent", label: "Agent" },
+  { href: "/app", label: "Analyst" },
   { href: "/screener", label: "Screener" },
   { href: "/stocks", label: "Stocks" },
   { href: "/wallet", label: "Wallet" },
+  { href: "/smart-money", label: "Smart money" },
+  { href: "/radar", label: "Rug Radar" },
 ];
 
 export function AppNav({ className = "" }: { className?: string }) {
@@ -19,9 +22,9 @@ export function AppNav({ className = "" }: { className?: string }) {
     <nav className={`flex gap-1 text-sm ${className}`}>
       {APP_NAV.map((n) =>
         path === n.href ? (
-          <span key={n.href} className="rounded-lg bg-white/[0.06] px-2.5 py-1.5 text-white">{n.label}</span>
+          <span key={n.href} className="shrink-0 whitespace-nowrap rounded-lg bg-white/[0.06] px-2.5 py-1.5 text-white">{n.label}</span>
         ) : (
-          <Link key={n.href} href={n.href} className="rounded-lg px-2.5 py-1.5 text-muted transition hover:text-white">{n.label}</Link>
+          <Link key={n.href} href={n.href} className="shrink-0 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-muted transition hover:text-white">{n.label}</Link>
         )
       )}
     </nav>
