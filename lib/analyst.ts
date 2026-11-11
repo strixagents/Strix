@@ -2,6 +2,8 @@ import { cached } from "./cache";
 import { postJson } from "./net";
 import { CHAIN, getPool, gt, risksFor, type Token } from "./rhchain";
 import { BOT_TX_COUNT, txCounts } from "./evm";
+import { scanContract, type ContractScan } from "./contract";
+import { HIDDEN_CHARS, revealHidden } from "./rhchain";
 
 const NET = "robinhood";
 
@@ -191,7 +193,7 @@ export async function getLargeTransfers(token: string, decimals: number, price: 
 export type Check = { key: string; label: string; status: "pass" | "warn" | "fail" | "info"; detail: string };
 export type Scorecard = { score: number; grade: "A" | "B" | "C" | "D" | "F"; verdict: string; checks: Check[] };
 
-export function buildScorecard(t: Token, info: TokenInfo | null, whales: WhaleReport | null): Scorecard {
+export function buildScorecard(t: Token, info: TokenInfo | null, whales: WhaleReport | null, contract: ContractScan | null = null): Scorecard {
   const c: Check[] = [];
   const add = (key: string, label: string, status: Check["status"], detail: string) => c.push({ key, label, status, detail });
   const usd = (n: number) => (n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : n >= 1e3 ? `$${(n / 1e3).toFixed(1)}K` : `$${n.toFixed(0)}`);
@@ -200,6 +202,16 @@ export function buildScorecard(t: Token, info: TokenInfo | null, whales: WhaleRe
     if (info.honeypot === "yes") add("honeypot", "Honeypot check", "fail", "Flagged as a honeypot — you may not be able to sell");
     else if (info.honeypot === "no") add("honeypot", "Honeypot check", "pass", "Not flagged as a honeypot");
     else add("honeypot", "Honeypot check", "info", "Not checked by the data provider for this token");
+  }
+  if (HIDDEN_CHARS.test(t.symbol) || HIDDEN_CHARS.test(t.name))
+    add("spoof", "Disguised name", "fail", `Symbol is really "${revealHidden(t.symbol)}" — hidden characters make it look like another token`);
+  if (contract?.isContract) {
+    const top = contract.findings.filter((f) => f.severity === "high").map((f) => f.label);
+    const mid = contract.findings.filter((f) => f.severity === "medium").map((f) => f.label);
+    if (contract.verdict === "issuer") add("contract", "Contract permissions", "info", contract.issuer ?? "Issuer-managed asset");
+    else if (top.length) add("contract", "Contract permissions", "fail", top.join(", "));
+    else if (mid.length) add("contract", "Contract permissions", "warn", mid.join(", "));
+    else add("contract", "Contract permissions", "pass", contract.owner?.renounced ? "Ownership renounced, no admin powers left" : "No owner, upgrade path or known admin function");
   }
   if (t.copycatOf) add("copycat", "Original token", "fail", `Same symbol as an older token (${t.copycatOf.slice(0, 8)}…) — verify the contract`);
   else add("copycat", "Original token", "pass", "No older token uses this symbol");
@@ -244,10 +256,14 @@ export function buildScorecard(t: Token, info: TokenInfo | null, whales: WhaleRe
 
 export async function analystReport(pool: string) {
   const t = await getPool(pool);
-  const [info, whales] = await Promise.all([getTokenInfo(t.address).catch(() => null), getWhales(t.pool, t.liquidity).catch(() => null)]);
+  const [info, whales, contract] = await Promise.all([
+    getTokenInfo(t.address).catch(() => null),
+    getWhales(t.pool, t.liquidity).catch(() => null),
+    scanContract(t.address, t.symbol).catch(() => null),
+  ]);
   const transfers =
     info?.decimals != null && t.price > 0
       ? await getLargeTransfers(t.address, info.decimals, t.price, Math.max(whaleThreshold(t.liquidity), 1000), [t.pool]).catch(() => [])
       : [];
-  return { token: t, info, whales, transfers, scorecard: buildScorecard(t, info, whales) };
+  return { token: t, info, whales, transfers, contract, scorecard: buildScorecard(t, info, whales, contract) };
 }

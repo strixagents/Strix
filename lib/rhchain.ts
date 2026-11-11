@@ -525,6 +525,7 @@ export const RISKS = {
   sell_pressure: { label: "Heavy selling", hint: "24h sells > 1.5× buys", w: 10 },
   copycat: { label: "Possible copycat", hint: "An older token on Robinhood Chain uses the same symbol — check the contract address", w: 35 },
   wash_volume: { label: "Wash volume", hint: "24h volume is more than 50× liquidity — likely wash trading or a drained pool", w: 20 },
+  spoofed_name: { label: "Disguised name", hint: "The name or symbol hides invisible Unicode characters (e.g. right-to-left override) so it can look like another token, such as USDT", w: 45 },
   fake_liquidity: { label: "Fake liquidity", hint: "The pool reports an impossible liquidity figure — a spoofed pool; real liquidity is unknown", w: 40 },
 } as const;
 export type RiskKey = keyof typeof RISKS;
@@ -544,6 +545,11 @@ export function signalsFor(t: Token): SignalKey[] {
   return s;
 }
 
+/** Invisible / direction-flipping characters used to make a symbol render as another one. */
+export const HIDDEN_CHARS = /[\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF]/;
+/** Symbol with hidden characters made visible, e.g. "‮TDSU" → "[RLO]TDSU". */
+export const revealHidden = (s: string) => s.replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF]/g, (c) => ({ "\u202E": "[RLO]", "\u202D": "[LRO]", "\u200F": "[RLM]", "\u200E": "[LRM]" } as Record<string, string>)[c] ?? "[hidden]");
+
 export function risksFor(t: Token): { flags: RiskKey[]; score: number; level: "Low" | "Medium" | "High" } {
   const f: RiskKey[] = [];
   if (t.liquidity < 50_000) f.push("low_liquidity");
@@ -555,6 +561,7 @@ export function risksFor(t: Token): { flags: RiskKey[]; score: number; level: "L
   if (t.txns.h24.sells > 50 && t.txns.h24.sells > 1.5 * t.txns.h24.buys) f.push("sell_pressure");
   if (t.copycatOf) f.push("copycat");
   if (t.fakeLiquidity) f.push("fake_liquidity");
+  if (HIDDEN_CHARS.test(t.symbol) || HIDDEN_CHARS.test(t.name)) f.push("spoofed_name");
   if (t.liquidity > 0 && t.volume.h24 > 50 * t.liquidity && t.volume.h24 > 10_000) f.push("wash_volume");
   const score = Math.min(100, f.reduce((s, k) => s + RISKS[k].w, 0));
   return { flags: f, score, level: score >= 45 ? "High" : score >= 20 ? "Medium" : "Low" };

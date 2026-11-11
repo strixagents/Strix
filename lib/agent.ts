@@ -6,6 +6,8 @@ import { scanWallet } from "./wallet";
 import { getRadar } from "./radar";
 import { getSmartMoney } from "./smartmoney";
 import { isAddress } from "./evm";
+import { scanContract } from "./contract";
+import { readImage, visionSummary } from "./vision";
 import {
   CHAIN, INTERVALS, RISKS, SIGNALS, getCandles, getNetworkStatus, getNewPools, getPool, getTopTokens, getTrending,
   getPrices, links, resolvePool, risksFor, searchTokens, signalsFor, trusted, type Interval, type SignalKey, type Token,
@@ -34,6 +36,8 @@ export type AgentAction =
 export type AgentCtx = {
   viewing?: string;
   web?: boolean;
+  /** data:image/… URL of a screenshot attached to the latest question */
+  image?: string;
   watchlist?: { pool: string; symbol: string }[];
   wallets?: { address: string; label: string }[];
   alerts?: { pool: string; symbol: string; price: number; dir: "above" | "below" }[];
@@ -48,6 +52,7 @@ export type Card =
   | { kind: "radar"; watching: number; events: { symbol: string; title: string; severity: string; pool: string }[] }
   | { kind: "traders"; windowHours: number; top: { wallet: string; pnlUsd: number; volumeUsd: number; automated: boolean }[] }
   | { kind: "action"; icon: string; text: string; href?: string }
+  | { kind: "contract"; symbol: string; address: string; verdict: string; sizeBytes: number; owner: string; proxy: string | null; findings: { label: string; severity: string; detail: string }[]; note: string }
   | { kind: "watchlist"; items: { symbol: string; pool: string; price: number; h24: number; liquidity: number; risk: string }[]; alerts: { symbol: string; price: number; dir: string; distancePct: number | null }[]; wallets: number }
   | { kind: "compare"; rows: { symbol: string; pool: string; price: number; h24: number; liquidity: number; volume24h: number; fdv: number | null; ageDays: number | null; risk: string; flags: string[] }[] };
 
@@ -201,6 +206,14 @@ export const TOOLS = [
   {
     type: "function",
     function: {
+      name: "scan_contract",
+      description: "Contract X-ray straight from the chain bytecode: can the owner mint, blacklist wallets, pause, change taxes/limits, switch trading off, or upgrade the code? Is ownership renounced? Use for 'is the contract safe', 'can they rug', 'renounced?', 'honeypot', or any token/contract address.",
+      parameters: { type: "object", properties: { token: { type: "string", description: "Symbol, token address or pool address" } }, required: ["token"] },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "compare_tokens",
       description: "Side-by-side comparison of 2–4 Robinhood Chain tokens: price, 24h change, liquidity, volume, FDV, pool age, risk level and flags. Use for 'X vs Y', 'compare', 'which is safer'.",
       parameters: { type: "object", properties: { tokens: { type: "array", items: { type: "string" }, description: "2–4 symbols or addresses" } }, required: ["tokens"] },
@@ -246,6 +259,30 @@ const WEB_ONLY = "Alerts, the watchlist and followed wallets live in the Strix w
 
 export async function runTool(name: string, args: Record<string, unknown>, ctx: AgentCtx = {}): Promise<ToolResult> {
   switch (name) {
+    case "scan_contract": {
+      const q = String(args.token ?? "").trim();
+      let address = q, symbol = q, pool: string | null = null;
+      try {
+        const t = await getPool(await resolvePool(q));
+        address = t.address;
+        symbol = t.symbol;
+        pool = t.pool;
+      } catch (e) {
+        if (!isAddress(q)) throw e; // a raw contract address can be scanned even if no DEX indexes its pool yet
+      }
+      const c = await scanContract(address, symbol);
+      return {
+        data: { symbol, tokenAddress: c.address, ...c, findings: c.findings.map(({ label, severity, detail }) => ({ label, severity, detail })) },
+        summary: `${symbol}: ${c.verdict}${c.findings.filter((f) => f.severity !== "info").length ? " · " + c.findings.filter((f) => f.severity !== "info").map((f) => f.label).join(", ") : ""}`,
+        ...(pool ? { focus: { pool, interval: "1h" as Interval } } : {}),
+        card: {
+          kind: "contract", symbol, address: c.address, verdict: c.verdict, sizeBytes: c.sizeBytes,
+          owner: c.owner ? (c.owner.renounced ? "renounced" : c.owner.address) : c.roleBased ? "admin roles" : "none",
+          proxy: c.proxy ? (c.proxy.upgradeable ? `upgradeable by ${c.proxy.upgrader}` : "locked proxy") : null,
+          findings: c.findings.map(({ label, severity, detail }) => ({ label, severity, detail })), note: c.note,
+        },
+      };
+    }
     case "compare_tokens": {
       const list = (Array.isArray(args.tokens) ? args.tokens : String(args.tokens ?? "").split(/[\s,]+/)).map(String).filter(Boolean).slice(0, 4);
       if (list.length < 2) throw new Error("Give at least two tokens to compare");
@@ -516,6 +553,7 @@ const LABELS: Record<string, (a: Record<string, unknown>) => string> = {
   get_stock_premiums: (a) => `Comparing ${a.ticker ?? "stock"} tokens with the real share price`,
   get_rug_radar: () => "Checking the Rug Radar (liquidity pulls, crashes, mints, copycats)",
   get_smart_money: () => "Ranking smart-money wallets (bots removed)",
+  scan_contract: (a) => `X-raying the ${a.token} contract bytecode (mint, blacklist, pause, upgrades…)`,
   compare_tokens: (a) => `Comparing ${(Array.isArray(a.tokens) ? a.tokens : [a.tokens]).join(" vs ")}`,
   get_my_watchlist: () => "Reading your watchlist, alerts and followed wallets",
   set_price_alert: (a) => `Setting a price alert on ${a.token}`,
@@ -538,6 +576,9 @@ Rules:
 - You can ACT for the user: set_price_alert ("alert me if…", "kasih tau kalau…"), manage_watchlist ("watch X", "pantau X"), follow_wallet. Do it when asked, then confirm in one line what was set. Percent requests ("if it drops 10%") → pass percent: -10.
 - "My tokens / my watchlist / my alerts / brief me" → get_my_watchlist (then add get_rug_radar for a briefing and warn if any watched token appears there or is High risk).
 - Comparing 2–4 tokens → compare_tokens (one call), then explain the differences in a table.
+- Contract questions ("can they rug / mint / blacklist", "renounced?", a contract address) → scan_contract. For issuer assets (official stock tokens, stablecoins) explain that admin powers are expected there.
+- If the message contains "[Image attached …]": first say in one line what you read (token symbols / addresses) so the user can verify it, then check each token or address with tools (get_token_scorecard, scan_contract, analyze_token, scan_wallet) and compare every claim in the image ("100x", "liquidity locked", "safe", "renounced") with the real on-chain data. Call out shill and scam patterns plainly. If an address was only partly readable, say so and don't guess it.
+- If a token has the "Disguised name" flag, warn loudly: hidden characters make its symbol look like another token (e.g. a fake USDT).
 - Rugs / dumps / "anything sketchy right now" → get_rug_radar. Top traders / who is winning → get_smart_money (mention automated wallets and that a short window is noisy).
 - If whales.washSuspect is true, say clearly that the volume is likely fake (one wallet trading with itself).
 - If a token has the "Possible copycat" flag, say so loudly: another older token uses the same symbol; tell the user to verify the contract address (copycatOf is the original).
@@ -703,6 +744,21 @@ export async function runAgent(history: { role: "user" | "assistant"; content: s
     if (e.t === "card") cards.push(e.card);
     emit(e);
   };
+  // a screenshot is read once, then the agent checks what it shows against live data
+  if (ctx.image && history.length) {
+    em({ t: "step", id: "v0", name: "read_image", label: "Reading your image (tokens, addresses, claims)" });
+    try {
+      const seen = await readImage(ctx.image);
+      em({ t: "step_done", id: "v0", ok: true, summary: visionSummary(seen) });
+      const last = history[history.length - 1];
+      history = [...history.slice(0, -1), { ...last, content: `${last.content}
+
+[Image attached — what the vision model read from it:]
+${seen}` }];
+    } catch (e) {
+      em({ t: "step_done", id: "v0", ok: false, summary: (e as Error).message.slice(0, 140) });
+    }
+  }
   const model = await agentLoop(history, em, ctx);
   emit({ t: "followups", items: followups(names, cards) });
   emit({ t: "meta", model, ms: Date.now() - t0, tools: names.length });

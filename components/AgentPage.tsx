@@ -9,6 +9,8 @@ import { store, useStore, type Followed, type PriceAlert, type WatchItem } from 
 
 const TOOLS: { icon: string; name: string; desc: string; href?: string }[] = [
   { icon: "⚡", name: "Actions", desc: "Sets price alerts, edits your watchlist, follows wallets" },
+  { icon: "🔬", name: "Contract X-ray", desc: "Reads the bytecode: mint, blacklist, pause, upgrades, owner" },
+  { icon: "🖼", name: "Reads screenshots", desc: "Paste a tweet or shill — it checks every claim on-chain" },
   { icon: "⚖", name: "Compare", desc: "2–4 tokens side by side: liquidity, age, risk" },
   { icon: "🛡", name: "Safety scorecard", desc: "A–F grade: honeypot, holders, dev wallet, copycats", href: "/app" },
   { icon: "🐋", name: "Whale tracker", desc: "Large buys/sells, bots filtered, wash-trading check", href: "/app" },

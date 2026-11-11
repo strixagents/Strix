@@ -157,6 +157,17 @@ server.registerTool(
 );
 
 server.registerTool(
+  "scan_contract",
+  {
+    title: "Contract X-ray",
+    description: "Reads a Robinhood Chain token's bytecode on-chain and reports admin powers: mint, blacklist, pause, tax/limit setters, trading switch, upgradeable proxy, and whether ownership is renounced.",
+    inputSchema: { token: z.string().describe("Symbol, token address or pool address") },
+    annotations: ro,
+  },
+  (a) => call("scan_contract", a)
+);
+
+server.registerTool(
   "compare_tokens",
   {
     title: "Compare tokens",

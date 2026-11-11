@@ -10,6 +10,8 @@ function readCtx(body: Record<string, unknown>): AgentCtx {
     web: body.client === "web",
     watchlist: arr(body.watchlist).filter((w) => ADDR.test(w?.pool)).slice(0, 10).map((w) => ({ pool: w.pool, symbol: clean(w.symbol, 20) })),
     wallets: arr(body.wallets).filter((w) => /^0x[0-9a-fA-F]{40}$/.test(w?.address)).slice(0, 10).map((w) => ({ address: w.address, label: clean(w.label, 40) })),
+    image:
+      typeof body.image === "string" && /^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/=]+$/.test(body.image) && body.image.length < 3_500_000 ? body.image : undefined,
     alerts: arr(body.alerts)
       .filter((a) => ADDR.test(a?.pool) && Number(a?.price) > 0)
       .slice(0, 15)

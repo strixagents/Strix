@@ -18,6 +18,7 @@ type Card =
   | { kind: "radar"; watching: number; events: { symbol: string; title: string; severity: string; pool: string }[] }
   | { kind: "traders"; windowHours: number; top: { wallet: string; pnlUsd: number; volumeUsd: number; automated: boolean }[] }
   | { kind: "action"; icon: string; text: string; href?: string }
+  | { kind: "contract"; symbol: string; address: string; verdict: string; sizeBytes: number; owner: string; proxy: string | null; findings: { label: string; severity: string; detail: string }[]; note: string }
   | { kind: "watchlist"; items: { symbol: string; pool: string; price: number; h24: number; liquidity: number; risk: string }[]; alerts: { symbol: string; price: number; dir: string; distancePct: number | null }[]; wallets: number }
   | { kind: "compare"; rows: { symbol: string; pool: string; price: number; h24: number; liquidity: number; volume24h: number; fdv: number | null; ageDays: number | null; risk: string; flags: string[] }[] };
 type Action =
@@ -25,8 +26,35 @@ type Action =
   | { kind: "watch"; op: "add" | "remove"; pool: string; symbol: string }
   | { kind: "follow"; op: "add" | "remove"; address: string; label: string };
 type Meta = { model: string; ms: number; tools: number };
+/** Downscale a screenshot in the browser: a ~1600px JPEG for the vision model and a small thumbnail for the chat. */
+async function shrinkImage(file: File): Promise<{ full: string; thumb: string }> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = rej;
+      i.src = url;
+    });
+    const draw = (max: number, q: number) => {
+      const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(img.naturalWidth * k));
+      c.height = Math.max(1, Math.round(img.naturalHeight * k));
+      const ctx = c.getContext("2d")!;
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      return c.toDataURL("image/jpeg", q);
+    };
+    return { full: draw(1600, 0.86), thumb: draw(240, 0.7) };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 type Msg = {
-  role: "user" | "assistant"; content: string; steps?: Step[]; cards?: Card[]; followups?: string[]; meta?: Meta;
+  role: "user" | "assistant"; content: string; image?: string; steps?: Step[]; cards?: Card[]; followups?: string[]; meta?: Meta;
   pending?: boolean; streaming?: boolean; error?: string; stopped?: boolean;
 };
 
@@ -47,6 +75,7 @@ const COMMANDS: { cmd: string; arg?: string; hint: string; build: (a: string) =>
   { cmd: "/alert", arg: "token level", hint: "e.g. /alert PONS -10%  ·  /alert NVDA 190", build: (a) => `Set a price alert: ${a}` },
   { cmd: "/watch", arg: "token", hint: "Add a token to your watchlist", build: (a) => `Add ${a} to my watchlist` },
   { cmd: "/analyze", arg: "token", hint: "On-chain stats + chart context on 1h & 4h", build: (a) => `Analyze ${a} on 1h and 4h — on-chain stats, trend, key levels and risks` },
+  { cmd: "/contract", arg: "token", hint: "X-ray the contract: mint, blacklist, pause, upgrades", build: (a) => `X-ray the ${a} contract — can the owner mint, blacklist, pause, change taxes or upgrade it? Is it renounced?` },
   { cmd: "/safe", arg: "token", hint: "A–F safety scorecard, honeypot, holders", build: (a) => `Is ${a} safe? Run the full safety scorecard and explain every red flag` },
   { cmd: "/whales", arg: "token", hint: "Whale buys/sells, wash-trading check", build: (a) => `Are whales buying or selling ${a}? Show the biggest wallets and check for wash trading` },
   { cmd: "/full", arg: "token", hint: "Everything: chart, safety and whales", build: (a) => `Full due diligence on ${a}: analyze the chart, run the safety scorecard and check whale activity, then give me the key takeaways` },
@@ -232,6 +261,37 @@ function CardView({ c, onFocus }: { c: Card; onFocus: (pool: string, interval: s
         </ul>
       </div>
     );
+  if (c.kind === "contract") {
+    const V: Record<string, [string, string]> = {
+      danger: ["🔴 Dangerous admin powers", "border-rose-400/40 bg-rose-400/[0.06] text-rose-200"],
+      caution: ["🟠 Some admin powers", "border-amber/40 bg-amber/[0.06] text-amber"],
+      clean: ["🟢 No admin powers found", "border-emerald-400/30 bg-emerald-400/[0.05] text-emerald-200"],
+      issuer: ["🏛 Issuer-managed asset", "border-sky-400/30 bg-sky-400/[0.05] text-sky-200"],
+    };
+    const [title, cls] = V[c.verdict] ?? ["Contract", "border-line text-zinc-200"];
+    return (
+      <div className={`animate-fade-up rounded-xl border p-3 text-xs ${cls}`}>
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-semibold">Contract X-ray · {c.symbol}</span>
+          <span>{title}</span>
+        </div>
+        <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-[10px] text-zinc-400">
+          <a href={`https://robinhoodchain.blockscout.com/address/${c.address}`} target="_blank" rel="noreferrer" className="hover:text-white">{short(c.address)} ↗</a>
+          <span>owner: {c.owner === "none" || c.owner === "renounced" || c.owner === "admin roles" ? c.owner : short(c.owner)}</span>
+          {c.proxy && <span>proxy: {c.proxy.replace(/0x[0-9a-f]{40}/i, (m) => short(m))}</span>}
+          <span>{c.sizeBytes.toLocaleString("en-US")} bytes</span>
+        </div>
+        <ul className="mt-2 space-y-1">
+          {c.findings.map((f) => (
+            <li key={f.label} className="flex gap-2 text-zinc-300">
+              <span className={f.severity === "high" ? "text-rose-400" : f.severity === "medium" ? "text-amber" : "text-zinc-500"}>{f.severity === "high" ? "✕" : f.severity === "medium" ? "!" : "·"}</span>
+              <span><b className="font-medium text-zinc-100">{f.label}</b> — {f.detail}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
   if (c.kind === "action")
     return (
       <div className="flex animate-fade-up items-center gap-2.5 rounded-xl border border-emerald-400/30 bg-emerald-400/[0.07] px-3 py-2.5 text-xs text-emerald-100">
@@ -376,6 +436,19 @@ export function AgentChat({
   const [toolCount, setToolCount] = useState<number | null>(null);
   const [copied, setCopied] = useState<number | null>(null);
   const [cmdIdx, setCmdIdx] = useState(0);
+  const [image, setImage] = useState<{ full: string; thumb: string } | null>(null);
+  const [imgErr, setImgErr] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const attach = async (f: File) => {
+    setImgErr(null);
+    if (f.size > 15 * 1024 * 1024) return setImgErr("Image is too large (max 15 MB).");
+    try {
+      setImage(await shrinkImage(f));
+      ta.current?.focus();
+    } catch {
+      setImgErr("Couldn't read that image — try a PNG or JPG screenshot.");
+    }
+  };
   const scroller = useRef<HTMLDivElement>(null);
   const ta = useRef<HTMLTextAreaElement>(null);
   const abort = useRef<AbortController | null>(null);
@@ -430,8 +503,9 @@ export function AgentChat({
   }, [input]);
 
   const send = async (raw: string, base?: Msg[]) => {
-    if (!raw.trim() || busy) return;
-    const text = expand(raw, current);
+    const pic = base ? null : image; // retries are text-only
+    if ((!raw.trim() && !pic) || busy) return;
+    const text = raw.trim() ? expand(raw, current) : "What is in this image? Check every token, address and claim in it against live on-chain data.";
     if (text == null) {
       // command needs a token / address the user hasn't typed yet
       setInput(`${raw.trim().split(/\s+/)[0]} `);
@@ -439,9 +513,10 @@ export function AgentChat({
       return;
     }
     const prior = (base ?? msgs).filter((m) => !m.error);
-    const history = [...prior, { role: "user" as const, content: text }];
+    const history = [...prior, { role: "user" as const, content: text, ...(pic ? { image: pic.thumb } : {}) }];
     setMsgs([...history, { role: "assistant", content: "", steps: [], cards: [], pending: true }]);
     setInput("");
+    setImage(null);
     setBusy(true);
     stick.current = true;
     const ctrl = new AbortController();
@@ -460,6 +535,7 @@ export function AgentChat({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           client: "web", viewing: current, watchlist: store.watch(), wallets: store.followed(), alerts: store.alerts(),
+          ...(pic ? { image: pic.full } : {}),
           messages: history.map(({ role, content }) => ({ role, content })),
         }),
         signal: ctrl.signal,
@@ -600,7 +676,11 @@ export function AgentChat({
 
         {msgs.map((m, i) =>
           m.role === "user" ? (
-            <div key={i} className="ml-8 animate-fade-up rounded-2xl rounded-br-sm bg-white/[0.07] px-4 py-2.5 text-sm">{m.content}</div>
+            <div key={i} className="ml-8 animate-fade-up space-y-2 rounded-2xl rounded-br-sm bg-white/[0.07] px-4 py-2.5 text-sm">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {m.image && <img src={m.image} alt="Attached screenshot" className="max-h-40 rounded-lg border border-line" />}
+              <div>{m.content}</div>
+            </div>
           ) : (
             <div key={i} className="space-y-3">
               {!!m.steps?.length && <Steps steps={m.steps} done={!m.pending && !busy || !!m.content} meta={m.meta} />}
@@ -668,9 +748,44 @@ export function AgentChat({
             ))}
           </div>
         )}
-        <div className="flex items-end gap-2 rounded-xl border border-line bg-ink/60 p-1.5 focus-within:border-amber/40">
+        {image && (
+          <div className="mb-2 flex items-center gap-2 rounded-lg border border-line bg-white/[0.03] p-1.5 text-xs text-zinc-400">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={image.thumb} alt="" className="h-12 w-12 rounded object-cover" />
+            <span className="flex-1">Screenshot attached — Strix will read it and check it against live data.</span>
+            <button type="button" onClick={() => setImage(null)} className="px-2 text-muted hover:text-white" aria-label="Remove image">✕</button>
+          </div>
+        )}
+        {imgErr && <div className="mb-2 text-xs text-rose-300">{imgErr}</div>}
+        <div
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            const f = [...e.dataTransfer.files].find((x) => x.type.startsWith("image/"));
+            if (f) {
+              e.preventDefault();
+              attach(f);
+            }
+          }}
+          className="flex items-end gap-2 rounded-xl border border-line bg-ink/60 p-1.5 focus-within:border-amber/40"
+        >
+          {!busy && (
+            <>
+              <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => e.target.files?.[0] && attach(e.target.files[0])} />
+              <button type="button" onClick={() => fileRef.current?.click()} title="Attach a screenshot" aria-label="Attach image"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-line text-zinc-400 transition hover:text-white">
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.5l-8.5 8.5a6 6 0 0 1-8.5-8.5L13 3.5a4 4 0 0 1 5.7 5.7l-9 9a2 2 0 0 1-2.8-2.8L15 7.3" /></svg>
+              </button>
+            </>
+          )}
           <textarea
             ref={ta}
+            onPaste={(e) => {
+              const f = [...e.clipboardData.files].find((x) => x.type.startsWith("image/"));
+              if (f) {
+                e.preventDefault();
+                attach(f);
+              }
+            }}
             value={input}
             onChange={(e) => {
               setInput(e.target.value);
@@ -706,7 +821,7 @@ export function AgentChat({
               ■ Stop
             </button>
           ) : (
-            <button disabled={!input.trim()} className="btn-primary rounded-lg px-3.5 py-2 text-sm disabled:opacity-40">Send</button>
+            <button disabled={!input.trim() && !image} className="btn-primary rounded-lg px-3.5 py-2 text-sm disabled:opacity-40">Send</button>
           )}
         </div>
         <p className="mt-2 text-center text-[10px] text-muted">

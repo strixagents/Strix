@@ -257,6 +257,21 @@ const commands = {
     });
   },
 
+  async contract() {
+    const token = rest[0];
+    if (!token) fail("Usage: strix contract <token | 0x address>");
+    await run(`X-raying ${token}…`, "scan_contract", { token }, (d) => {
+      const tone = { danger: red("DANGER"), caution: yellow("CAUTION"), clean: green("CLEAN"), issuer: cyan("ISSUER-MANAGED") }[d.verdict] ?? d.verdict;
+      console.log(`
+${bold(d.symbol)} ${gray(short(d.tokenAddress))}  ${tone}`);
+      console.log(gray(`  ${d.sizeBytes} bytes · owner ${d.owner ? (d.owner.renounced ? "renounced" : short(d.owner.address)) : d.roleBased ? "admin roles" : "none"}${d.proxy ? ` · ${d.proxy.kind}${d.proxy.upgradeable ? " (upgradeable)" : " (locked)"}` : ""}`));
+      for (const f of d.findings) console.log(`  ${f.severity === "high" ? red("✕") : f.severity === "medium" ? yellow("!") : gray("·")} ${bold(f.label)} ${gray("— " + f.detail)}`);
+      console.log(gray(`
+  ${d.note}
+`));
+    });
+  },
+
   async compare() {
     if (rest.length < 2) fail("Usage: strix compare <token> <token> [token] [token]");
     await run(`Comparing ${rest.join(" vs ")}…`, "compare_tokens", { tokens: rest.slice(0, 4) }, (d) => {
@@ -310,6 +325,7 @@ ${bold("Usage")}
   strix stocks [ticker]             Stock tokens vs the real share price (premium/discount)
   strix wallet <0x…>                Wallet holdings, risk, spam filter and 24h trades
   strix search <name|symbol>        Find a token / pool
+  strix contract <token|0x…>        Contract X-ray: mint, blacklist, pause, upgrades, owner
   strix compare <A> <B> [C] [D]     Side-by-side: liquidity, volume, age, risk
   strix radar [type]                Rug Radar: liquidity pulls, crashes, mints, copycats
   strix smart [pnl|volume|trades]   Smart-money leaderboard (bots removed)
