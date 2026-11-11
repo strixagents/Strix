@@ -1,4 +1,5 @@
 import { cached, peek, put, swr } from "./cache";
+import { postJson } from "./net";
 
 /* ───────────── Robinhood Chain config ───────────── */
 
@@ -479,18 +480,16 @@ function weekly(c: Candle[]): Candle[] {
 
 export async function getNetworkStatus() {
   return cached("rh:net", 8_000, async () => {
-    const res = await fetch(CHAIN.rpc, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify([
+    const res = await postJson(
+      CHAIN.rpc,
+      JSON.stringify([
         { jsonrpc: "2.0", id: 1, method: "eth_chainId", params: [] },
         { jsonrpc: "2.0", id: 2, method: "eth_blockNumber", params: [] },
         { jsonrpc: "2.0", id: 3, method: "eth_gasPrice", params: [] },
       ]),
-      cache: "no-store",
-      signal: AbortSignal.timeout(8_000),
-    });
-    if (!res.ok) throw new Error(`RPC ${res.status}`);
+      8_000
+    );
+    if (res.status < 200 || res.status >= 300) throw new Error(`RPC ${res.status}`);
     const arr = (await res.json()) as { id: number; result: string }[];
     const get = (id: number) => arr.find((x) => x.id === id)?.result ?? "0x0";
     return {

@@ -1,4 +1,5 @@
 import { CHAIN } from "./rhchain";
+import { postJson } from "./net";
 
 /* Minimal EVM helpers for Robinhood Chain — no external libraries. */
 
@@ -8,13 +9,7 @@ export const BLOCK_MS = 104; // measured average block time on chain 4663
 
 export async function rpc<T>(method: string, params: unknown[], timeout = 15_000): Promise<T> {
   for (let attempt = 0; attempt < 3; attempt++) {
-    const res = await fetch(CHAIN.rpc, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-      cache: "no-store",
-      signal: AbortSignal.timeout(timeout),
-    });
+    const res = await postJson(CHAIN.rpc, JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }), timeout);
     if (res.status === 429) {
       await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
       continue;
@@ -38,13 +33,7 @@ export async function rpcBatch<T>(calls: { method: string; params: unknown[] }[]
   for (let i = 0; i < calls.length; i += group) {
     const slice = calls.slice(i, i + group);
     for (let attempt = 0; attempt < 3; attempt++) {
-      const res = await fetch(CHAIN.rpc, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(slice.map((c, k) => ({ jsonrpc: "2.0", id: i + k, method: c.method, params: c.params }))),
-        cache: "no-store",
-        signal: AbortSignal.timeout(20_000),
-      });
+      const res = await postJson(CHAIN.rpc, JSON.stringify(slice.map((c, k) => ({ jsonrpc: "2.0", id: i + k, method: c.method, params: c.params }))), 20_000);
       const j = await res.json().catch(() => null);
       if (res.status === 429 || !Array.isArray(j)) {
         await new Promise((r) => setTimeout(r, 900 * (attempt + 1)));

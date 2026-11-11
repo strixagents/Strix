@@ -1,4 +1,5 @@
 import { cached } from "./cache";
+import { postJson } from "./net";
 import { CHAIN, getPool, gt, risksFor, type Token } from "./rhchain";
 import { BOT_TX_COUNT, txCounts } from "./evm";
 
@@ -143,13 +144,7 @@ const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a
 const ZERO = "0x0000000000000000000000000000000000000000";
 
 async function rpc<T>(method: string, params: unknown[]): Promise<T> {
-  const res = await fetch(CHAIN.rpc, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-    cache: "no-store",
-    signal: AbortSignal.timeout(12_000),
-  });
+  const res = await postJson(CHAIN.rpc, JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }), 12_000);
   const j = (await res.json()) as { result?: T; error?: { message: string } };
   if (j.error) throw new Error(j.error.message);
   return j.result as T;
