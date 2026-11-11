@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Logo } from "./Logo";
 import { NetworkBadge, Pct, RISK_LABELS, SIGNALS, TokenIcon, fmtAge, fmtPrice, fmtUsd, riskCls, toneCls, type Token } from "./market-ui";
-import { WalletButton } from "./WalletButton";
 import { AppNav } from "./AppHeader";
 
 type List = "top" | "trending" | "new";
@@ -92,7 +91,6 @@ export function Screener() {
         <AppNav />
         <div className="ml-auto flex items-center gap-2">
           <span className="hidden md:inline"><NetworkBadge /></span>
-          <WalletButton className="hidden sm:block" />
         </div>
       </header>
 

@@ -8,7 +8,6 @@ import { LiveCarousel } from "@/components/landing/LiveCarousel";
 import { HeroOrbit, ScaledOrbit } from "@/components/landing/HeroOrbit";
 import { Aurora } from "@/components/landing/Aurora";
 import { LiveAgentPanel, MiniScreener, LiveChainPulse, LiveRiskCheck, StatusDot } from "@/components/landing/Widgets";
-import { WalletButton } from "@/components/WalletButton";
 
 const faqs = [
   {
@@ -23,11 +22,6 @@ const faqs = [
     q: "How does the risk score work?",
     a: "Every token gets a quick Low / Medium / High risk level from live pool data (thin liquidity, very new pool, FDV far above liquidity, extreme moves, few buyers, heavy selling, copycat symbols, fake liquidity, disguised names, wash volume). The full A–F safety scorecard adds holders, top-10 concentration, developer holding, whale and wash-trading checks, and a Contract X-ray that reads the token bytecode for mint, blacklist, pause, tax and upgrade powers. It is a warning system, not a guarantee.",
   },
-  {
-    q: "Do I need to connect a wallet?",
-    a: "No. Connecting is optional: it adds Robinhood Chain to your wallet and shows your ETH balance. Strix never asks you to sign a transaction.",
-  },
-  { q: "Which wallets does Strix support?", a: "Any injected EVM wallet such as MetaMask or Rabby. One click adds Robinhood Chain (chain ID 4663) to your wallet." },
   {
     q: "Can I use the agent outside the browser?",
     a: "Yes. The same agent and the same live tools are available as a CLI (strix ask, strix radar, strix wallet…) and as an MCP server for Claude Code and other MCP clients. Source and setup are on GitHub.",
@@ -105,7 +99,6 @@ export default function Home() {
             <p className="mt-6 max-w-md text-base leading-relaxed text-muted sm:text-lg">
               Free. No sign-up. In your browser, your terminal (CLI) and any MCP client.
             </p>
-            <WalletButton className="mt-5 inline-block" />
             <ScaledOrbit scale={0.66} className="pointer-events-none mx-auto mt-12 lg:hidden" />
           </Reveal>
 

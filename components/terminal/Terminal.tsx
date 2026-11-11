@@ -8,7 +8,6 @@ import {
   NetworkBadge, Pct, RISK_LABELS, SIGNALS, TokenIcon, fmtAge, fmtPrice, fmtUsd, riskCls, toneCls, usePoll,
   type Overview, type Token,
 } from "../market-ui";
-import { WalletButton } from "../WalletButton";
 import { AppNav } from "../AppHeader";
 import { AgentChat } from "./AgentChat";
 import { PriceChart, type Candle } from "./PriceChart";
@@ -210,7 +209,6 @@ export function Terminal() {
         <AppNav className="hidden md:flex" />
         <Search onPick={(p) => setSel(p)} />
         <div className="hidden md:block"><NetworkBadge /></div>
-        <WalletButton className="hidden sm:block" />
       </header>
 
       <div className="flex border-b border-line lg:hidden">

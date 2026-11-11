@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "./Logo";
 import { NetworkBadge } from "./market-ui";
-import { WalletButton } from "./WalletButton";
 
 export const APP_NAV = [
   { href: "/agent", label: "Agent" },
@@ -43,7 +42,6 @@ export function AppHeader() {
         <AppNav className="hidden sm:flex" />
         <div className="ml-auto flex items-center gap-2">
           <span className="hidden md:inline"><NetworkBadge /></span>
-          <WalletButton className="hidden sm:block" />
         </div>
       </div>
       <AppNav className="overflow-x-auto px-3 pb-2 sm:hidden" />
