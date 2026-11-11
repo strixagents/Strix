@@ -1,3 +1,5 @@
+<p align="center"><img src="brand/banner.png" alt="Strix — the AI agent for Robinhood Chain" width="100%"></p>
+
 # Strix
 
 **The AI agent for Robinhood Chain (chain ID 4663)** — an on-chain agent with a built-in analyst, usable from the web, the CLI and any MCP client. Rug-risk checks, whale and wallet tracking, Rug Radar, stock-token premiums and live charts — all from real on-chain and market data.

@@ -1,19 +1,19 @@
-export function Logo({ className = "h-7 w-7", mono = false }: { className?: string; mono?: boolean }) {
-  // Abstract owl: two eyes inside a faceted head
+/**
+ * Strix mark: two rounded squares overlapping — amber and violet, with the shared area lit
+ * where they meet (two signals combining: the agent and the chain).
+ * `mono` is kept for older call sites; the mark is always shown in brand colour.
+ */
+export function Logo({ className = "h-7 w-7" }: { className?: string; mono?: boolean }) {
   return (
     <svg viewBox="0 0 32 32" className={className} aria-hidden="true">
       <defs>
-        <linearGradient id="strix-g" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#ffb547" />
-          <stop offset="100%" stopColor="#ff6a3d" />
-        </linearGradient>
+        <clipPath id="strix-logo-a">
+          <rect x="3" y="4" width="16.5" height="16.5" rx="4.6" />
+        </clipPath>
       </defs>
-      <path d="M6 6 L11 9 H21 L26 6 V20 C26 25 21 28 16 28 C11 28 6 25 6 20 Z" fill={mono ? "#f2f2f2" : "url(#strix-g)"} />
-      <circle cx="12" cy="16" r="3.4" fill="#0a0a0a" />
-      <circle cx="20" cy="16" r="3.4" fill="#0a0a0a" />
-      <circle cx="12.8" cy="15.2" r="1.1" fill="#fff" />
-      <circle cx="20.8" cy="15.2" r="1.1" fill="#fff" />
-      <path d="M15 20.5 L16 22.5 L17 20.5 Z" fill="#0a0a0a" />
+      <rect x="3" y="4" width="16.5" height="16.5" rx="4.6" fill="#ff9f43" />
+      <rect x="12.5" y="11.5" width="16.5" height="16.5" rx="4.6" fill="#7c5cff" />
+      <rect x="12.5" y="11.5" width="16.5" height="16.5" rx="4.6" fill="#ffc2ff" clipPath="url(#strix-logo-a)" />
     </svg>
   );
 }

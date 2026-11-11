@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Logo } from "../Logo";
 import { Pct, SIGNALS, TokenIcon, fmtPrice, fmtUsd, riskCls, usePoll, type Overview, type Token } from "../market-ui";
 
 type Row = Token & { signals: string[]; risk: { level: "Low" | "Medium" | "High"; score: number; flags: string[] } };
@@ -117,7 +118,7 @@ export function LiveAgentPanel() {
         </svg>
         <div className="mt-3 rounded-lg border border-[#262626] bg-[#111] p-3 text-[12px] text-zinc-300">
           <div className="mb-1 flex items-center gap-2 text-[11px] text-[#888]">
-            <span className="grid h-4 w-4 place-items-center rounded bg-white text-[9px] font-bold text-black">S</span> Strix · live summary
+            <Logo className="h-4 w-4" /> Strix · live summary
           </div>
           {t && a ? (
             <>
@@ -131,7 +132,7 @@ export function LiveAgentPanel() {
         </div>
       </div>
       <div className="flex flex-col p-4 text-[12px]">
-        <div className="mx-auto mb-3 mt-2 grid h-10 w-10 place-items-center rounded-xl bg-white text-lg font-bold text-black">S</div>
+        <Logo className="mx-auto mb-3 mt-2 h-10 w-10" />
         <p className="text-center text-[#aaa]">Strix Agent reads live Robinhood Chain pools, candles and risk for every token you ask about.</p>
         <p className="mt-4 text-[#ccc]">Ask Strix to:</p>
         <ul className="mt-1 list-disc space-y-0.5 pl-4 text-[#aaa]">
