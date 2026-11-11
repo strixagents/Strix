@@ -14,6 +14,7 @@ export const APP_NAV = [
   { href: "/wallet", label: "Wallet" },
   { href: "/smart-money", label: "Smart money" },
   { href: "/radar", label: "Rug Radar" },
+  { href: "/docs", label: "Docs" },
 ];
 
 export function AppNav({ className = "" }: { className?: string }) {

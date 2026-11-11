@@ -29,7 +29,7 @@ export type ContractScan = {
   scannedAt: number;
 };
 
-const GROUPS: { key: string; label: string; sigs: string[]; severity: Severity; what: string }[] = [
+export const GROUPS: { key: string; label: string; sigs: string[]; severity: Severity; what: string }[] = [
   { key: "mint", label: "Can mint new tokens", severity: "high", what: "new supply can be created and dumped on holders",
     sigs: ["mint(address,uint256)", "mint(uint256)", "mintTo(address,uint256)", "mint(address[],uint256[])", "issue(uint256)", "issue(address,uint256)", "mintFor(address,uint256)"] },
   { key: "blacklist", label: "Can blacklist wallets", severity: "high", what: "chosen wallets can be blocked from selling",

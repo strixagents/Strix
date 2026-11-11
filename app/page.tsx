@@ -341,7 +341,7 @@ export default function Home() {
             {[
               { h: "Agent", l: [["AI Agent", "/agent"], ["Analyst", "/app"], ["Rug Radar", "/radar"], ["Smart money", "/smart-money"], ["Wallet scanner", "/wallet"]] },
               { h: "Robinhood Chain", l: [["Screener", "/screener"], ["Stock tokens", "/stocks"], ["New pools", "/screener"], ["Explorer", "https://robinhoodchain.blockscout.com"]] },
-              { h: "Developers", l: [["CLI & MCP", "https://github.com/strixagents/Strix"], ["FAQ", "/#faq"], ["Features", "/#features"]] },
+              { h: "Developers", l: [["Docs", "/docs"], ["CLI & MCP", "/docs#cli"], ["GitHub", "https://github.com/strixagents/Strix"], ["FAQ", "/#faq"], ["Features", "/#features"]] },
               { h: "Data", l: [["GeckoTerminal", "https://www.geckoterminal.com/robinhood/pools"], ["DexScreener", "https://dexscreener.com/robinhood"], ["Blockscout", "https://robinhoodchain.blockscout.com"]] },
             ].map((c) => (
               <div key={c.h}>
