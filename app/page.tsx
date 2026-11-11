@@ -17,11 +17,11 @@ const faqs = [
   },
   {
     q: "Is the data real?",
-    a: "Yes. Pools, prices, volume, liquidity and candles come live from GeckoTerminal and DexScreener. Wallet balances, transfers, block height and gas come straight from the Robinhood Chain RPC. Real stock prices for the stock-token comparison come from Yahoo Finance. Every indicator is computed on our server from those numbers.",
+    a: "Yes. Pools, prices, volume, liquidity and candles come live from GeckoTerminal and DexScreener. Wallet balances, transfers, contract bytecode, block height and gas come straight from the Robinhood Chain RPC. Real stock prices for the stock-token comparison come from Yahoo Finance. Every indicator is computed on our server from those numbers.",
   },
   {
     q: "How does the risk score work?",
-    a: "Strix flags low liquidity, very new pools, FDV far above liquidity, extreme moves, few unique buyers and heavy selling, then scores the token Low, Medium or High. It is a warning system, not a guarantee.",
+    a: "Every token gets a quick Low / Medium / High risk level from live pool data (thin liquidity, very new pool, FDV far above liquidity, extreme moves, few buyers, heavy selling, copycat symbols, fake liquidity, disguised names, wash volume). The full A–F safety scorecard adds holders, top-10 concentration, developer holding, whale and wash-trading checks, and a Contract X-ray that reads the token bytecode for mint, blacklist, pause, tax and upgrade powers. It is a warning system, not a guarantee.",
   },
   {
     q: "Do I need to connect a wallet?",

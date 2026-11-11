@@ -13,22 +13,26 @@
 | **Agent** (`/agent`) | Full-page AI agent: streams answers, runs live tools (scorecard, whales, wallets, Rug Radar, smart money…), shows data cards, slash commands and follow-up questions |
 | **Analyst** (`/app`) | Candlestick charts (EMA 20/50/200, auto support/resistance), on-chain stats (liquidity, FDV, buys/sells, pool age), price alerts — with the agent docked beside the chart |
 | **AI agent** | Ask in plain language — it calls live tools and explains the result. Groq primary, Google Gemini backup, rule-based fallback |
+| **Agent actions** | Sets real price alerts (sound + notification on any Strix tab), edits your watchlist, follows wallets; `/brief` gives a personal briefing. Saved in your browser — no account |
+| **Reads screenshots** | Attach, paste or drop a tweet / Telegram shill / chart — Gemini reads the tokens, addresses and claims, and the agent checks each one on-chain |
+| **Contract X-ray** | Reads token bytecode from the RPC: mint, blacklist, pause, tax/limit setters, trading switch, upgradeable proxies and who controls them, owner renounced or not. Feeds the A–F scorecard |
 | **Analyst panel** | A–F safety scorecard (honeypot, copycat, liquidity, holders, top-10 concentration, dev holding, wash trading), whale flow with bot/relayer detection, holder distribution |
 | **Screener** (`/screener`) | Top / trending / new pools with on-chain signals and risk scores |
 | **Stocks** (`/stocks`) | Official Robinhood stock tokens vs the real share price — premium/discount, lookalike tokens flagged |
 | **Wallet** (`/wallet`) | Any wallet's holdings with risk per token, fake-airdrop filter, 24h buys/sells (smart money), follow list |
 | **Smart money** (`/smart-money`) | Wallets ranked by ~24h PnL, volume or activity on the most liquid tokens — bots and relayers removed, automated wallets labelled |
 | **Rug Radar** (`/radar`) | Background watcher: liquidity pulls, price crashes, sudden supply mints (read from chain logs) and copycat launches |
-| **CLI** | `strix ask`, `analyze`, `safe`, `whales`, `scan`, `new`, `stocks`, `wallet`, `smart`, `radar`, `news` |
+| **CLI** | `strix ask`, `analyze`, `safe`, `contract`, `compare`, `whales`, `scan`, `new`, `stocks`, `wallet`, `smart`, `radar`, `news` |
 | **MCP server** | Use every Strix tool from Claude Code or any MCP client |
 
 ## Data sources (all free)
 
-- **Robinhood Chain RPC** — blocks, gas, wallet balances (Multicall3), transfers
+- **Robinhood Chain RPC** — blocks, gas, wallet balances (Multicall3), transfers, contract bytecode (falls back to DNS-over-HTTPS when an ISP blocks the RPC)
 - **GeckoTerminal** — pools, candles, trades, holders (optional free CoinGecko Demo key for higher limits)
 - **DexScreener** — live pair prices, search
 - **Yahoo Finance** — real stock prices for the premium comparison
 - **Google News RSS** — Robinhood Chain headlines
+- **Groq / Google Gemini** (free tiers) — the AI reasoning; Gemini also reads screenshots
 
 ## Setup
 

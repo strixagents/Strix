@@ -129,7 +129,7 @@ export function WalletPage() {
           <div className="mt-8 rounded-2xl border border-line bg-panel p-6 text-sm text-muted">
             <div className="flex items-center gap-3">
               <span className="h-2 w-2 animate-pulse rounded-full bg-white/70" />
-              Reading balances of ~100 tokens and the last 24h of transfers on chain 4663…
+              Reading balances of the tracked tokens plus every token this wallet touched, and its last 24h of transfers on chain 4663…
             </div>
             <div className="mt-4 space-y-2">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-10 animate-pulse rounded-lg bg-white/5" />)}</div>
           </div>
