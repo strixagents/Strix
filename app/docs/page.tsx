@@ -253,30 +253,29 @@ export default function DocsPage() {
 
           <section>
             <H id="cli">CLI</H>
-            <P>The CLI talks to a running Strix server and uses the same tools as the web agent.</P>
+            <P>The CLI uses the same tools as the web agent. By default it talks to the hosted Strix at strixagents.com, so there is no server to run.</P>
             <CopyCode
               code={`git clone https://github.com/strixagents/Strix
-cd Strix && npm install && npm link
-cp .env.example .env.local     # add a free Groq key for "strix ask"
-npm run dev -- -p 3001         # the CLI talks to this server`}
+cd Strix && npm install && npm link   # installs the strix and strix-mcp commands
+
+strix ask "Is PONS safe?"
+strix contract CASHCAT`}
             />
             <Table head={["Command", "What it does"]} rows={CLI_COMMANDS.map(([c, d]) => [<C key="c">{c}</C>, d])} />
             <P>
-              Options: <C>--json</C> raw JSON for scripts, <C>--no-color</C> plain text, <C>STRIX_URL</C> server URL (default <C>http://localhost:3001</C>).
+              Options: <C>--json</C> raw JSON for scripts, <C>--no-color</C> plain text, <C>STRIX_URL</C> server URL (default <C>https://strixagents.com</C>). To run your own server: copy <C>.env.example</C> to <C>.env.local</C>, add a free Groq key, run <C>npm run dev -- -p 3001</C> and set <C>STRIX_URL=http://localhost:3001</C>.
             </P>
           </section>
 
           <section>
             <H id="mcp">MCP server</H>
-            <P>Use Strix as a tool inside Claude Code or any MCP client. With the Strix server running, register it like this:</P>
+            <P>Use Strix as a tool inside Claude Code or any MCP client. After <C>npm link</C> (see CLI), register it like this — it uses the hosted Strix unless you set <C>STRIX_URL</C>:</P>
             <CopyCode
               title=".mcp.json"
               code={`{
   "mcpServers": {
     "strix": {
-      "command": "node",
-      "args": ["bin/strix-mcp.mjs"],
-      "env": { "STRIX_URL": "http://localhost:3001" }
+      "command": "strix-mcp"
     }
   }
 }`}
@@ -290,9 +289,9 @@ npm run dev -- -p 3001         # the CLI talks to this server`}
             <H id="api">HTTP API</H>
             <P>All endpoints return JSON and are read-only. Please be gentle — they share free upstream quotas.</P>
             <Table head={["Method", "Endpoint", "Returns"]} rows={API.map(([m, e, d]) => [<span key="m" className="font-mono text-xs text-muted">{m}</span>, <C key="e">{e}</C>, d])} />
-            <CopyCode code={`curl "http://localhost:3001/api/contract?token=PONS"
+            <CopyCode code={`curl "https://strixagents.com/api/contract?token=PONS"
 
-curl -X POST http://localhost:3001/api/tool \\
+curl -X POST https://strixagents.com/api/tool \\
   -H "content-type: application/json" \\
   -d '{"name":"get_token_scorecard","args":{"token":"PONS"}}'`} />
             <P>

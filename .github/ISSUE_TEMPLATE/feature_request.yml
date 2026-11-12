@@ -1,0 +1,15 @@
+name: Feature request
+description: Suggest a tool, check or improvement
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What should Strix do?
+    validations:
+      required: true
+  - type: textarea
+    id: data
+    attributes:
+      label: Data source
+      description: Which live (free) source would it use?

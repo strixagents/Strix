@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Strix MCP server — exposes the Strix Robinhood Chain tools to any MCP client (Claude Code, etc.) over stdio.
-// It forwards each call to a running Strix server (default http://localhost:3001, override with STRIX_URL),
+// It forwards each call to a running Strix server (default https://strixagents.com, override with STRIX_URL),
 // so it shares the same live data, caches and rate limiting as the web app.
 // NOTE: stdout is the MCP channel — never console.log here; use console.error for diagnostics.
 
@@ -8,7 +8,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
-const BASE = (process.env.STRIX_URL || "http://localhost:3001").replace(/\/$/, "");
+const BASE = (process.env.STRIX_URL || "https://strixagents.com").replace(/\/$/, "");
 
 const INTERVALS = ["15m", "1h", "4h", "1d", "1w"];
 const SIGNALS = ["momentum", "breakout", "dip_buy", "volume_spike", "buy_pressure", "sell_pressure", "dumping", "new_pool", "deep_liquidity"];

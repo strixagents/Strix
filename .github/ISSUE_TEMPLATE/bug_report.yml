@@ -1,0 +1,26 @@
+name: Bug report
+description: Something is broken or shows wrong data
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you see, and what did you expect?
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      description: Page URL, CLI command or MCP tool
+      placeholder: https://strixagents.com/agent · strix contract PONS
+  - type: input
+    id: token
+    attributes:
+      label: Token / pool / wallet (if any)
+      placeholder: symbol or 0x… address
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or logs

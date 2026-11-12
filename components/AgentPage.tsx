@@ -25,8 +25,6 @@ const TOOLS: { icon: string; name: string; desc: string; href?: string }[] = [
 
 const CLI = `git clone https://github.com/strixagents/Strix
 cd Strix && npm install && npm link
-cp .env.example .env.local   # free Groq key for "ask"
-npm run dev -- -p 3001       # the CLI talks to this server
 
 strix ask "Is PONS safe?"
 strix radar
@@ -35,9 +33,7 @@ strix wallet 0x…`;
 const MCP = `{
   "mcpServers": {
     "strix": {
-      "command": "node",
-      "args": ["bin/strix-mcp.mjs"],
-      "env": { "STRIX_URL": "http://localhost:3001" }
+      "command": "strix-mcp"
     }
   }
 }`;
@@ -163,7 +159,7 @@ export function AgentPage() {
           </ul>
 
           <h2 className="mt-7 text-sm font-semibold">Same agent in your terminal</h2>
-          <p className="mt-1 text-xs text-muted">The CLI and the MCP server call the exact same tools as this page, through a Strix server you run locally.</p>
+          <p className="mt-1 text-xs text-muted">The CLI and the MCP server call the exact same tools as this page, — no server to run, it uses strixagents.com.</p>
           <div className="mt-3 space-y-3">
             <Snippet title="CLI" code={CLI} />
             <Snippet title="MCP · .mcp.json (Claude Code & other MCP clients)" code={MCP} />

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Strix CLI — the Robinhood Chain AI agent in your terminal.
-// Talks to a running Strix server (default http://localhost:3001, override with STRIX_URL).
+// Talks to the hosted Strix at https://strixagents.com by default; set STRIX_URL to use your own server.
 
-const BASE = (process.env.STRIX_URL || "http://localhost:3001").replace(/\/$/, "");
+const BASE = (process.env.STRIX_URL || "https://strixagents.com").replace(/\/$/, "");
 const argv = process.argv.slice(2);
 const JSON_OUT = argv.includes("--json");
 const NO_COLOR = argv.includes("--no-color") || !!process.env.NO_COLOR || !process.stdout.isTTY;
@@ -34,7 +34,7 @@ async function tool(name, args = {}) {
   try {
     res = await fetch(`${BASE}/api/tool`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, args }) });
   } catch {
-    fail(`Can't reach the Strix server at ${BASE}. Start it with:  npx next dev -p 3001`);
+    fail(`Can't reach the Strix server at ${BASE}. Check your connection, or set STRIX_URL to your own server.`);
   }
   const j = await res.json().catch(() => ({}));
   if (!res.ok || j.error) fail(j.error || `HTTP ${res.status}`);
@@ -85,7 +85,7 @@ const commands = {
     try {
       res = await fetch(`${BASE}/api/agent`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: [{ role: "user", content: q }] }) });
     } catch {
-      fail(`Can't reach the Strix server at ${BASE}. Start it with:  npx next dev -p 3001`);
+      fail(`Can't reach the Strix server at ${BASE}. Check your connection, or set STRIX_URL to your own server.`);
     }
     if (!res.ok || !res.body) fail((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
     const dec = new TextDecoder();
@@ -334,7 +334,7 @@ ${bold("Usage")}
 ${bold("Options")}
   --json        Raw JSON output (for scripts)
   --no-color    Plain text
-  STRIX_URL     Server URL (default http://localhost:3001)
+  STRIX_URL     Server URL (default https://strixagents.com)
 
 ${bold("Signals")}  momentum, breakout, dip_buy, volume_spike, buy_pressure, sell_pressure, dumping, new_pool, deep_liquidity
 

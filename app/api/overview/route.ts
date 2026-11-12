@@ -1,4 +1,4 @@
-import { getNetworkStatus, getTopTokens, getTrending, risksFor, signalsFor, trusted } from "@/lib/rhchain";
+import { getNetworkStatus, getTopTokens, getTrending, risksFor, signalsFor, trusted, HIDDEN_CHARS } from "@/lib/rhchain";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -10,7 +10,9 @@ export async function GET() {
       getTrending({ wait: false }).catch(() => []),
       getNetworkStatus().catch(() => null),
     ]);
-    const tokens = top.slice(0, 40).map((t) => ({ ...t, signals: signalsFor(t), risk: risksFor(t) }));
+    // real tokens first; copycats, fake liquidity and disguised names stay visible (flagged) but below them
+    const suspect = (t: (typeof top)[number]) => !trusted(t) || HIDDEN_CHARS.test(t.symbol) || HIDDEN_CHARS.test(t.name);
+    const tokens = [...top.filter((t) => !suspect(t)), ...top.filter(suspect)].slice(0, 40).map((t) => ({ ...t, signals: signalsFor(t), risk: risksFor(t) }));
     // rankings and totals only count real tokens — copycats and fake liquidity would distort them
     const real = top.filter(trusted);
     const liquid = real.filter((t) => t.liquidity > 100_000);
