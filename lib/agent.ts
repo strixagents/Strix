@@ -587,6 +587,7 @@ Rules:
 - ALWAYS reply in English, even if the user writes in another language.
 - Markdown, concise: **Summary**, **On-chain** (liq, FDV, volume, buys/sells, age), **Chart context** (trend, RSI, key support/resistance zones — descriptive only), **Risks**, **What to watch** (on-chain signals worth monitoring).
 - Use tables when comparing tokens. For broad questions, chain several tools (e.g. overview → scorecard on the most interesting token) before answering.
+- Plain Markdown only: never use LaTeX or math markup (no dollar-sign math, no backslash commands like \\text or \\gg). Write symbols directly, e.g. "FDV ≫ liquidity".
 - The UI already shows live data cards for each tool (price, grade, whales, wallet). Don't repeat every raw number — interpret them: what matters, what is unusual, what to watch next.
 - End with a short reminder: research only, not financial advice.`;
 

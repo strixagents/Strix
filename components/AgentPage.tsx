@@ -62,7 +62,7 @@ function Snippet({ title, code }: { title: string; code: string }) {
 }
 
 /** The user's own watchlist / alerts / wallets with live prices — the same data the agent reads. */
-function MyPanel() {
+function MyPanel({ heading = true }: { heading?: boolean }) {
   const watch = useStore<WatchItem[]>(store.watch, []);
   const alerts = useStore<PriceAlert[]>(store.alerts, []);
   const wallets = useStore<Followed[]>(store.followed, []);
@@ -71,7 +71,7 @@ function MyPanel() {
   const px = (pool: string) => prices?.[pool.toLowerCase()] ?? null;
   return (
     <div className="mb-7">
-      <h2 className="text-sm font-semibold">Your watchlist</h2>
+      {heading && <h2 className="text-sm font-semibold">Your watchlist</h2>}
       {!watch.length && !alerts.length && !wallets.length ? (
         <p className="mt-1 text-xs text-muted">
           Empty. Tell the agent “watch PONS”, “alert me if CASHCAT drops 10%” or “follow 0x…”. Saved in this browser only.
@@ -119,10 +119,34 @@ function MyPanel() {
   );
 }
 
+/** Small screens have no sidebar — the same watchlist panel opens from a bar above the chat. */
+function MobileWatchlist() {
+  const [open, setOpen] = useState(false);
+  const watch = useStore<WatchItem[]>(store.watch, []);
+  const alerts = useStore<PriceAlert[]>(store.alerts, []);
+  return (
+    <div className="border-b border-line xl:hidden">
+      <button onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm">
+        <span>⭐ Your watchlist</span>
+        <span className="font-mono text-[11px] text-muted">
+          {watch.length} token{watch.length === 1 ? "" : "s"} · {alerts.length} alert{alerts.length === 1 ? "" : "s"}
+        </span>
+        <span className={`ml-auto text-muted transition ${open ? "rotate-180" : ""}`} aria-hidden>▾</span>
+      </button>
+      {open && (
+        <div className="max-h-[45dvh] overflow-y-auto px-4 pb-1">
+          <MyPanel heading={false} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AgentPage() {
   return (
     <div className="flex h-dvh flex-col bg-ink">
       <AppHeader />
+      <MobileWatchlist />
       <div className="flex min-h-0 flex-1">
         <section className="relative min-w-0 flex-1">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(50%_100%_at_50%_0%,rgba(124,196,255,0.07),transparent)]" aria-hidden />

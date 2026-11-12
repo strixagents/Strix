@@ -383,7 +383,10 @@ export default function Home() {
         <div className="mt-16 border-t border-[#1f1f1f]">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 py-8">
             <StatusDot />
-            <span className="text-sm text-muted">© Strix {new Date().getFullYear()} · Not financial advice</span>
+            <span className="text-sm text-muted">
+              © Strix {new Date().getFullYear()} · Not financial advice ·{" "}
+              <Link href="/terms" className="underline-offset-2 transition hover:text-white hover:underline">Terms & Disclaimer</Link>
+            </span>
           </div>
         </div>
         <div className="select-none overflow-hidden pb-16 pt-8 text-center">

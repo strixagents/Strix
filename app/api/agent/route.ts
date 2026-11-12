@@ -61,7 +61,14 @@ export async function POST(req: Request) {
         }
       };
       try {
-        await runAgent(history, emit, readCtx(body));
+        const ctx = readCtx(body);
+        // screenshots use the free Gemini vision quota — cap them separately; the question is still answered without the image
+        if (ctx.image && !rateLimit(`vision:${ip}`, 6, 10 * 60_000)) {
+          ctx.image = undefined;
+          emit({ t: "step", id: "vlimit", name: "read_image", label: "Image limit reached (6 per 10 minutes) — answering without the screenshot" });
+          emit({ t: "step_done", id: "vlimit", ok: false, summary: "try the screenshot again in a few minutes" });
+        }
+        await runAgent(history, emit, ctx);
       } catch (e) {
         emit({ t: "error", message: (e as Error).message });
       } finally {

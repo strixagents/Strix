@@ -12,10 +12,27 @@ const serif = Instrument_Serif({
   variable: "--font-serif-display",
 });
 
+const SITE_DESCRIPTION =
+  "An on-chain AI agent for Robinhood Chain: safety scorecards, Contract X-ray, Rug Radar, whale and wallet tracking — live data, in the browser, the CLI and any MCP client.";
+
 export const metadata: Metadata = {
+  metadataBase: new URL("https://strixagents.com"),
   title: "Strix — the AI agent for Robinhood Chain",
-  description:
-    "An on-chain AI agent with a built-in analyst for Robinhood Chain (chain 4663): rug-risk checks, whale and wallet tracking, Rug Radar and live charts — in the browser, the CLI and any MCP client. Free.",
+  description: SITE_DESCRIPTION,
+  openGraph: {
+    type: "website",
+    siteName: "Strix",
+    url: "https://strixagents.com",
+    title: "Strix — the AI agent for Robinhood Chain",
+    description: SITE_DESCRIPTION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    site: "@strix_agents",
+    creator: "@strix_agents",
+    title: "Strix — the AI agent for Robinhood Chain",
+    description: SITE_DESCRIPTION,
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
