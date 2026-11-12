@@ -621,7 +621,7 @@ const compact = (data: unknown) =>
  * Try each provider in order. A rate-limited primary hands over to the backup immediately
  * (no waiting); only the last provider waits out a short 429 before giving up.
  */
-async function chatAny(providers: LLM[], messages: Msg[], onWait: (s: number) => void, onSwitch: (to: string) => void, onDelta: (t: string) => void) {
+async function chatAny(providers: LLM[], messages: Msg[], onWait: (s: number) => void, onSwitch: (to: string, why: string) => void, onDelta: (t: string) => void) {
   let lastErr: Error | null = null;
   for (let i = 0; i < providers.length; i++) {
     const isLast = i === providers.length - 1;
@@ -629,13 +629,36 @@ async function chatAny(providers: LLM[], messages: Msg[], onWait: (s: number) =>
       return { ...(await chat(providers[i], messages, isLast ? onWait : null, onDelta)), model: providers[i].name };
     } catch (e) {
       lastErr = e as Error;
-      if (!isLast) onSwitch(providers[i + 1].name);
+      if (!isLast) onSwitch(providers[i + 1].name, reason(lastErr));
     }
   }
   throw lastErr ?? new Error("No AI provider configured");
 }
 
+/** Short human reason for a provider failure, e.g. "rate limited", "access denied (403)". */
+function reason(e: Error | null) {
+  const m = e?.message ?? "";
+  const code = m.match(/LLM (\d{3})/)?.[1];
+  if (code === "429") return "rate limited";
+  if (code === "403") return "access denied (403)";
+  if (code === "401") return "invalid key (401)";
+  if (code && code >= "500") return `provider error (${code})`;
+  if (/timeout|aborted/i.test(m)) return "timed out";
+  return code ? `error ${code}` : "unavailable";
+}
+
+const isGemini = (cfg: LLM) => cfg.base.includes("generativelanguage.googleapis.com");
+/** Tool calls produced by another model have no Gemini thought signature; Gemini accepts this documented placeholder for them. */
+function forGemini(messages: Msg[]): Msg[] {
+  return messages.map((m) =>
+    m.role === "assistant" && m.tool_calls?.length
+      ? { ...m, tool_calls: m.tool_calls.map((tc) => (tc.extra_content ? tc : { ...tc, extra_content: { google: { thought_signature: "skip_thought_signature_validator" } } })) }
+      : m
+  );
+}
+
 async function chat(cfg: LLM, messages: Msg[], onWait: ((s: number) => void) | null, onDelta: (t: string) => void) {
+  if (isGemini(cfg)) messages = forGemini(messages);
   for (let attempt = 0; ; attempt++) {
     const res = await fetch(`${cfg.base}/chat/completions`, {
       method: "POST",
@@ -794,10 +817,10 @@ async function agentLoop(history: { role: "user" | "assistant"; content: string 
           emit({ t: "step", id, name: "wait", label: `AI is busy (free tier limit) — continuing in ${s}s` });
           setTimeout(() => emit({ t: "step_done", id, ok: true, summary: "resumed" }), s * 1000);
         },
-        (to) => {
+        (to, why) => {
           const id = `w${waitN++}`;
           emit({ t: "step", id, name: "switch", label: `Primary AI is busy — switching to ${to}` });
-          emit({ t: "step_done", id, ok: true, summary: `using ${to}` });
+          emit({ t: "step_done", id, ok: true, summary: `using ${to} · ${why}` });
           if (streamed) emit({ t: "reset" });
           streamed = false;
           // keep using the backup for the rest of this answer
@@ -967,7 +990,7 @@ ${NOTE}
 **Risk flags:** ${d.risk.flags.join(", ") || "none detected"}
 **Signals:** ${d.signals.join(", ") || "none"}
 
-${ta ? `**Technical (1h):** RSI ${fmt(ta.rsi, 1)} · MACD hist ${fmt(ta.macd.hist, 4)} · EMA20/50/200 ${fmt(ta.ema20)} / ${fmt(ta.ema50)} / ${fmt(ta.ema200)}
+${ta ? `**Technical (1h):** RSI ${fmt(ta.rsi, 1)} · MACD hist ${fmt((ta as unknown as { macdHist?: number }).macdHist ?? ta.macd?.hist, 4)} · EMA20/50/200 ${fmt(ta.ema20)} / ${fmt(ta.ema50)} / ${fmt(ta.ema200)}
 **Why:** ${ta.reasons.join("; ")}.
 
 **Support:** ${lv(ta.support)}
