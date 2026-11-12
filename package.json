@@ -31,5 +31,8 @@
   "bin": {
     "strix": "bin/strix.mjs",
     "strix-mcp": "bin/strix-mcp.mjs"
+  },
+  "engines": {
+    "node": ">=20.9.0"
   }
 }

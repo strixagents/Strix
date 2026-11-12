@@ -96,9 +96,6 @@ export default function Home() {
                 Open the analyst
               </Link>
             </div>
-            <p className="mt-6 max-w-md text-base leading-relaxed text-muted sm:text-lg">
-              Free. No sign-up. In your browser, your terminal (CLI) and any MCP client.
-            </p>
             <ScaledOrbit scale={0.66} className="pointer-events-none mx-auto mt-12 lg:hidden" />
           </Reveal>
 
