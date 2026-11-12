@@ -835,7 +835,13 @@ async function agentLoop(history: { role: "user" | "assistant"; content: string 
       return "rule-based";
     }
     if (!msg.tool_calls?.length) {
-      emit({ t: "answer", text: msg.content || "…" });
+      if (!msg.content?.trim()) {
+        // a provider occasionally ends with no text — never show an empty answer, use the live-data report instead
+        if (streamed) emit({ t: "reset" });
+        await runFallback(history.at(-1)?.content ?? "", emit, "busy");
+        return "rule-based";
+      }
+      emit({ t: "answer", text: msg.content });
       return msg.model;
     }
     if (streamed) emit({ t: "reset" });

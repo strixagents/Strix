@@ -6,6 +6,7 @@
   <img alt="Robinhood Chain 4663" src="https://img.shields.io/badge/Robinhood%20Chain-4663-22c55e?style=flat-square">
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111?style=flat-square&logo=nextdotjs">
   <img alt="MCP server" src="https://img.shields.io/badge/MCP-server-444?style=flat-square">
+  <a href="https://x.com/strix_agents"><img alt="Follow on X" src="https://img.shields.io/badge/follow-%40strix__agents-000?style=flat-square&logo=x"></a>
 </p>
 
 <p align="center">
@@ -18,7 +19,8 @@
   <a href="https://strixagents.com/agent"><b>Try the agent</b></a> ·
   <a href="https://strixagents.com/docs"><b>Docs</b></a> ·
   <a href="#cli"><b>CLI</b></a> ·
-  <a href="#mcp-server"><b>MCP</b></a>
+  <a href="#mcp-server"><b>MCP</b></a> ·
+  <a href="https://x.com/strix_agents"><b>X / Twitter</b></a>
 </p>
 
 <p align="center"><img src="docs/screenshots/agent.png" alt="Strix agent answering with a live safety scorecard" width="90%"></p>
