@@ -371,7 +371,7 @@ function CardView({ c, onFocus }: { c: Card; onFocus: (pool: string, interval: s
 const Answer = memo(function Answer({ text }: { text: string }) {
   return (
     <div className="prose-strix text-sm leading-relaxed">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ href, children }) => <a href={href} target={href?.startsWith("/") ? undefined : "_blank"} rel="noreferrer">{children}</a> }}>
+      <ReactMarkdown remarkPlugins={[[remarkGfm, { singleTilde: false }]]} components={{ a: ({ href, children }) => <a href={href} target={href?.startsWith("/") ? undefined : "_blank"} rel="noreferrer">{children}</a> }}>
         {text}
       </ReactMarkdown>
     </div>

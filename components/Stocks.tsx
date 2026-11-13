@@ -147,7 +147,7 @@ export function Stocks() {
                   <td className="px-3 py-2.5 text-[11px] text-muted">
                     {r.premiumPct == null && r.stockPrice != null ? "Gap too large — token may not be 1:1 with the share. " : ""}
                     {r.stockPrice == null ? "No public stock quote. " : ""}
-                    {r.lookalikes ? <span className="text-amber">{r.lookalikes} lookalike token{r.lookalikes > 1 ? "s" : ""} use this ticker</span> : ""}
+                    {r.lookalikes ? <span className="text-amber">{r.lookalikes} lookalike token{r.lookalikes > 1 ? "s use" : " uses"} this ticker</span> : ""}
                   </td>
                 </tr>
               ))}
