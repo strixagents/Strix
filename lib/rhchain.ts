@@ -225,10 +225,14 @@ function markCopycats(list: Token[], reference: Token[] = []): Token[] {
   return list.map((t) => {
     const o = original.get(t.symbol.toUpperCase());
     if (!o || o.address.toLowerCase() === t.address.toLowerCase()) return t;
-    // a days-old copy "holding" far more liquidity than the token it imitates is not believable
-    const implausible = (t.ageHours ?? 0) < 24 * 7 && t.liquidity > 1_000_000 && t.liquidity > 5 * Math.max(o.liquidity, 1);
+    const implausible = implausibleCopy(t, o.liquidity);
     return implausible ? { ...t, copycatOf: o.address, liquidity: 0, fakeLiquidity: true } : { ...t, copycatOf: o.address };
   });
+}
+
+/** A days-old copy "holding" far more liquidity than the token it imitates is not believable. */
+function implausibleCopy(t: Token, originalLiquidity: number): boolean {
+  return (t.ageHours ?? 0) < 24 * 7 && t.liquidity > 1_000_000 && t.liquidity > 5 * Math.max(originalLiquidity, 1);
 }
 
 /** Tokens whose numbers can be trusted in chain-wide totals and rankings (no copycats, no fake liquidity). */
@@ -287,7 +291,7 @@ async function dsPairs(pools: string[]): Promise<Map<string, Token>> {
 /** Refresh price/changes/liquidity/txns of a GeckoTerminal list with DexScreener (keeps GT's image, buyers and summed volume). */
 async function freshen(list: Token[], key: string): Promise<Token[]> {
   const live = await cached(`ds:${key}`, 30_000, () => dsPairs(list.map((t) => t.pool))).catch(() => new Map<string, Token>());
-  return list.map((t) => {
+  const fresh = list.map((t) => {
     const l = live.get(t.pool.toLowerCase());
     if (!l || !l.price) return t;
     return {
@@ -297,6 +301,13 @@ async function freshen(list: Token[], key: string): Promise<Token[]> {
       image: t.image ?? l.image,
     };
   });
+  // the live liquidity can turn a copycat's figure implausible — re-check it against the original it imitates
+  const origLiq = new Map<string, number>();
+  for (const t of [...(peek<Token[]>("rh:top") ?? []), ...fresh])
+    if (!t.copycatOf) origLiq.set(t.address.toLowerCase(), Math.max(origLiq.get(t.address.toLowerCase()) ?? 0, t.liquidity));
+  return fresh.map((t) =>
+    t.copycatOf && !t.fakeLiquidity && implausibleCopy(t, origLiq.get(t.copycatOf.toLowerCase()) ?? 0) ? { ...t, liquidity: 0, fakeLiquidity: true } : t
+  );
 }
 
 /* ───────────── lists (GeckoTerminal, long-cached) ───────────── */

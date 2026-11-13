@@ -8,6 +8,8 @@ import { getStockTokens } from "./stocks";
 type Known = { address: string; symbol: string; name: string; image: string | null; price: number; token: Token | null; pool: string | null; liquidity: number };
 
 /** Every token Strix already knows a price for (top, trending, new, stock tokens). */
+const STABLE_SYMBOLS = new Set(["USDG", "USDC", "USDT", "USDE", "DAI", "PYUSD", "USD1"]);
+
 async function knownTokens(): Promise<Map<string, Known>> {
   const map = new Map<string, Known>();
   const add = (t: Token) => {
@@ -157,12 +159,14 @@ export async function scanWallet(address: string, hours = 24) {
       const sym = (k?.symbol ?? "?").toUpperCase();
       const official = officialBySymbol.get(sym);
       const lookalike = !!official && official !== t;
+      // a "USDG"/"USDC"/… that isn't worth ~$1 is a fake stablecoin, whatever its market says
+      const fakeStable = !!k && STABLE_SYMBOLS.has(sym) && (k.price < 0.9 || k.price > 1.1);
       holdings.push({
         address: k?.address ?? t, symbol: k?.symbol ?? "?", name: k?.name ?? "Unknown token", image: k?.image ?? null, balance: bal,
         price: k?.price ?? null, value, change24h: k?.token?.change.h24 ?? null, liquidity: k?.liquidity ?? null, pool: k?.pool ?? null,
         risk: k?.token ? risksFor(k.token) : null,
-        spam: lookalike || !k,
-        spamReason: lookalike ? `Lookalike of the real ${sym}` : !k ? "Unpriced token with no DEX market" : undefined,
+        spam: lookalike || fakeStable || !k,
+        spamReason: lookalike ? `Lookalike of the real ${sym}` : fakeStable ? `Fake stablecoin — a real ${sym} is worth $1` : !k ? "Unpriced token with no DEX market" : undefined,
       });
     });
 
