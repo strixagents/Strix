@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#050507">
+<title>Strix — offline</title>
+<style>
+  * { margin: 0; box-sizing: border-box; }
+  html, body { height: 100%; background: #050507; color: #f4f1ea; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  body { display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center;
+    background: radial-gradient(ellipse 60% 50% at 50% 0%, #ff9f4318, transparent 70%), #050507; }
+  img { width: 72px; height: 72px; border-radius: 18px; }
+  h1 { font-size: 28px; letter-spacing: -0.03em; margin-top: 22px; }
+  p { color: #a1a1aa; margin-top: 10px; line-height: 1.5; max-width: 340px; }
+  button { margin-top: 24px; padding: 11px 22px; border-radius: 12px; border: 1px solid #ffffff22; background: #f4f1ea; color: #050507; font-weight: 600; font-size: 15px; cursor: pointer; }
+</style>
+</head>
+<body>
+  <main>
+    <img src="/icons/icon-192.png" alt="Strix">
+    <h1>You're offline</h1>
+    <p>Strix reads Robinhood Chain live, so it needs a connection. Reconnect and try again.</p>
+    <button onclick="location.reload()">Try again</button>
+  </main>
+</body>
+</html>

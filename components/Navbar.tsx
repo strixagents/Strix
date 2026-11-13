@@ -13,6 +13,7 @@ const links = [
   { href: "/smart-money", label: "Smart money" },
   { href: "/radar", label: "Rug Radar" },
   { href: "/docs", label: "Docs" },
+  { href: "/download", label: "App" },
 ];
 
 export function Navbar() {

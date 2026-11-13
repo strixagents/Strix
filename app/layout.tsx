@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 import { AlertWatcher } from "@/components/AlertWatcher";
+import { PwaRegister } from "@/components/InstallApp";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
@@ -26,6 +27,8 @@ export const metadata: Metadata = {
     title: "Strix — the AI agent for Robinhood Chain",
     description: SITE_DESCRIPTION,
   },
+  applicationName: "Strix",
+  appleWebApp: { capable: true, title: "Strix", statusBarStyle: "black-translucent" },
   twitter: {
     card: "summary_large_image",
     site: "@strix_agents",
@@ -35,12 +38,15 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = { themeColor: "#050507" };
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${geist.variable} ${geistMono.variable} ${serif.variable}`}>
       <body className="font-sans">
         {children}
         <AlertWatcher />
+        <PwaRegister />
       </body>
     </html>
   );

@@ -4,6 +4,7 @@ const PAGES: [string, number][] = [
   ["", 1],
   ["/agent", 0.9],
   ["/docs", 0.8],
+  ["/download", 0.7],
   ["/app", 0.8],
   ["/radar", 0.7],
   ["/smart-money", 0.6],
