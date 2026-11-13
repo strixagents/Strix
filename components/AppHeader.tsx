@@ -12,6 +12,7 @@ export const APP_NAV = [
   { href: "/stocks", label: "Stocks" },
   { href: "/wallet", label: "Wallet" },
   { href: "/smart-money", label: "Smart money" },
+  { href: "/launches", label: "Launches" },
   { href: "/radar", label: "Rug Radar" },
   { href: "/docs", label: "Docs" },
   { href: "/download", label: "App" },

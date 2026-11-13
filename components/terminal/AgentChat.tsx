@@ -190,6 +190,7 @@ function CardView({ c, onFocus }: { c: Card; onFocus: (pool: string, interval: s
           ))}
           {!bad.length && <span className="rounded border border-emerald-400/30 px-1.5 py-0.5 text-[10px] text-emerald-300">✓ all checks passed</span>}
         </div>
+        <Link href={`/t/${c.pool}`} className="mt-2.5 inline-block text-[11px] font-medium text-amber hover:underline">Full report & share ↗</Link>
       </div>
     );
   }

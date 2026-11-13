@@ -344,6 +344,7 @@ export function Terminal() {
                       </div>
                     ) : null}
                     <div className="mt-3 flex flex-wrap gap-3 text-xs">
+                      <a href={`/t/${t.pool}`} className="font-medium text-amber underline-offset-2 hover:underline">Safety report & share ↗</a>
                       <a href={lk!.explorer} target="_blank" rel="noreferrer" className="text-zinc-300 underline-offset-2 hover:underline">Explorer ↗</a>
                       <a href={lk!.geckoterminal} target="_blank" rel="noreferrer" className="text-zinc-300 underline-offset-2 hover:underline">GeckoTerminal ↗</a>
                       <a href={lk!.dexscreener} target="_blank" rel="noreferrer" className="text-zinc-300 underline-offset-2 hover:underline">DexScreener ↗</a>
