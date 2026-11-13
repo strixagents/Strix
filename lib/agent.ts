@@ -591,25 +591,57 @@ Rules:
 - The UI already shows live data cards for each tool (price, grade, whales, wallet). Don't repeat every raw number — interpret them: what matters, what is unusual, what to watch next.
 - End with a short reminder: research only, not financial advice.`;
 
-type LLM = { name: string; key: string; base: string; model: string };
+type LLM = { name: string; key: string; base: string; model: string; extra?: Record<string, unknown> };
 
-/** Primary (Groq) + optional backup (Google Gemini, free) — both speak the OpenAI chat format. */
+const GROQ_BASE = "https://api.groq.com/openai/v1";
+/** Every Groq model has its own free per-minute token budget, so a chain of models multiplies capacity. */
+const GROQ_FALLBACKS = ["qwen/qwen3.8-27b", "openai/gpt-oss-20b"];
+const GEMINI_DEFAULT = ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
+const csv = (v: string | undefined) => (v ?? "").split(",").map((m) => m.trim()).filter(Boolean);
+const uniq = (a: string[]) => [...new Set(a)];
+
+/** Keep "thinking" short: on free tiers a long reasoning phase is what makes answers slow. */
+function reasoningFor(model: string): Record<string, unknown> | undefined {
+  if (/gpt-oss/.test(model)) return { reasoning_effort: "low" };
+  if (/qwen3/.test(model)) return { reasoning_effort: "none" };
+  if (/^gemini-/.test(model)) return { reasoning_effort: "low" };
+  return undefined;
+}
+
+/** Groq models first (fast), then Gemini models (free backup) — all speak the OpenAI chat format. */
 function llmProviders(): LLM[] {
   const list: LLM[] = [];
-  if (process.env.LLM_API_KEY)
-    list.push({
-      name: "Groq",
-      key: process.env.LLM_API_KEY,
-      base: (process.env.LLM_BASE_URL || "https://api.groq.com/openai/v1").replace(/\/$/, ""),
-      model: process.env.LLM_MODEL || "openai/gpt-oss-120b",
-    });
-  if (process.env.GEMINI_API_KEY) {
-    // comma-separated chain: if one Gemini model is overloaded (503) or retired (404), the next is tried
-    const models = (process.env.GEMINI_MODEL || "gemini-3.5-flash,gemini-3.5-flash-lite").split(",").map((m) => m.trim()).filter(Boolean);
+  if (process.env.LLM_API_KEY) {
+    const base = (process.env.LLM_BASE_URL || GROQ_BASE).replace(/\/$/, "");
+    const primary = csv(process.env.LLM_MODEL);
+    const first = primary.length ? primary : ["openai/gpt-oss-120b"];
+    const models = base === GROQ_BASE ? uniq([...first, ...csv(process.env.LLM_FALLBACK_MODELS || GROQ_FALLBACKS.join(","))]) : first;
     for (const model of models)
-      list.push({ name: `Gemini (${model})`, key: process.env.GEMINI_API_KEY, base: "https://generativelanguage.googleapis.com/v1beta/openai", model });
+      list.push({ name: `Groq (${model.replace(/^.*\//, "")})`, key: process.env.LLM_API_KEY, base, model, extra: base === GROQ_BASE ? reasoningFor(model) : undefined });
+  }
+  if (process.env.GEMINI_API_KEY) {
+    // if one Gemini model is overloaded (503), out of quota (429) or retired (404), the next is tried
+    for (const model of uniq([...csv(process.env.GEMINI_MODEL), ...GEMINI_DEFAULT]))
+      list.push({ name: `Gemini (${model})`, key: process.env.GEMINI_API_KEY, base: "https://generativelanguage.googleapis.com/v1beta/openai", model, extra: reasoningFor(model) });
   }
   return list;
+}
+
+/** Providers that just failed are skipped until their cooldown ends, so nobody waits on a known-busy model. */
+const cooldown = new Map<string, number>();
+function coolDown(p: LLM, e: Error) {
+  const m = e.message;
+  const retryIn = +(m.match(/try again in ([\d.]+)s/)?.[1] ?? 0);
+  const daily = /quota|per day|RESOURCE_EXHAUSTED/i.test(m) && !retryIn;
+  const secs = daily ? 900 : retryIn || (/LLM 404/.test(m) ? 3600 : /timed out|timeout|aborted/i.test(m) ? 60 : 30);
+  cooldown.set(p.name, Date.now() + Math.min(secs, 3600) * 1000);
+}
+/** Ready providers in their normal order; cooling ones go last (soonest-ready first) as a final resort. */
+function byReadiness(list: LLM[]): LLM[] {
+  const now = Date.now();
+  const ready = list.filter((p) => (cooldown.get(p.name) ?? 0) <= now);
+  const cooling = list.filter((p) => (cooldown.get(p.name) ?? 0) > now).sort((a, b) => cooldown.get(a.name)! - cooldown.get(b.name)!);
+  return [...ready, ...cooling];
 }
 const llmConfig = () => llmProviders()[0] ?? null;
 export const llmEnabled = () => llmConfig() != null;
@@ -622,14 +654,16 @@ const compact = (data: unknown) =>
  * Try each provider in order. A rate-limited primary hands over to the backup immediately
  * (no waiting); only the last provider waits out a short 429 before giving up.
  */
-async function chatAny(providers: LLM[], messages: Msg[], onWait: (s: number) => void, onSwitch: (to: string, why: string) => void, onDelta: (t: string) => void) {
+async function chatAny(all: LLM[], messages: Msg[], onWait: (s: number) => void, onSwitch: (to: string, why: string) => void, onDelta: (t: string) => void) {
+  const providers = byReadiness(all);
   let lastErr: Error | null = null;
   for (let i = 0; i < providers.length; i++) {
     const isLast = i === providers.length - 1;
     try {
-      return { ...(await chat(providers[i], messages, isLast ? onWait : null, onDelta)), model: providers[i].name };
+      return { ...(await chat(providers[i], messages, isLast ? onWait : null, onDelta, isLast ? 90_000 : 20_000)), model: providers[i].name };
     } catch (e) {
       lastErr = e as Error;
+      coolDown(providers[i], lastErr);
       if (!isLast) onSwitch(providers[i + 1].name, reason(lastErr));
     }
   }
@@ -658,15 +692,18 @@ function forGemini(messages: Msg[]): Msg[] {
   );
 }
 
-async function chat(cfg: LLM, messages: Msg[], onWait: ((s: number) => void) | null, onDelta: (t: string) => void) {
+async function chat(cfg: LLM, messages: Msg[], onWait: ((s: number) => void) | null, onDelta: (t: string) => void, firstByteMs = 90_000) {
   if (isGemini(cfg)) messages = forGemini(messages);
   for (let attempt = 0; ; attempt++) {
+    // a provider that hasn't started answering within firstByteMs is abandoned for the next one
+    const ctl = new AbortController();
+    const firstByte = setTimeout(() => ctl.abort(new Error("timed out waiting for the first token")), firstByteMs);
     const res = await fetch(`${cfg.base}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${cfg.key}` },
-      body: JSON.stringify({ model: cfg.model, messages, tools: TOOLS, tool_choice: "auto", temperature: 0.3, stream: true }),
-      signal: AbortSignal.timeout(90_000),
-    });
+      body: JSON.stringify({ model: cfg.model, messages, tools: TOOLS, tool_choice: "auto", temperature: 0.3, stream: true, ...cfg.extra }),
+      signal: AbortSignal.any([ctl.signal, AbortSignal.timeout(120_000)]),
+    }).finally(() => clearTimeout(firstByte));
     if (res.status === 429 && attempt === 0) {
       // free tier per-minute token limit: wait as told (max 25s) and retry once
       const body = await res.text();
@@ -760,7 +797,61 @@ function followups(names: string[], cards: Card[]) {
   return [...new Set(out)].slice(0, 3);
 }
 
+/**
+ * Identical first questions (e.g. the suggested prompts, clicked by many people at once) share one run:
+ * a request that arrives while the same question is being answered joins it, and for two minutes after,
+ * the finished answer is replayed instead of spending the free AI budget again. Personal context
+ * (watchlist, wallets, alerts, a screenshot) or a follow-up question always gets its own run.
+ */
+type Shared = { at: number; done: boolean; keep: boolean; events: AgentEvent[]; subs: Set<(e: AgentEvent) => void>; finished: Promise<void> };
+const SHARED_TTL = 120_000;
+const shared = new Map<string, Shared>();
+function shareKey(history: { role: string; content: string }[], ctx: AgentCtx): string | null {
+  if (history.length !== 1 || ctx.image || ctx.watchlist?.length || ctx.wallets?.length || ctx.alerts?.length) return null;
+  const q = history[0].content.trim().toLowerCase().replace(/\s+/g, " ");
+  return q && q.length <= 300 ? `${ctx.web ? "web" : "cli"}|${ctx.viewing ?? ""}|${q}` : null;
+}
+
 export async function runAgent(history: { role: "user" | "assistant"; content: string }[], emit: (e: AgentEvent) => void, ctx: AgentCtx = {}) {
+  const key = shareKey(history, ctx);
+  if (!key) return runAgentFresh(history, emit, ctx);
+  const now = Date.now();
+  for (const [k, v] of shared) if (v.done && now - v.at > SHARED_TTL) shared.delete(k);
+  const existing = shared.get(key);
+  if (existing) {
+    const t0 = Date.now();
+    const out = (e: AgentEvent) => emit(e.t === "meta" ? { ...e, ms: Date.now() - t0 } : e);
+    existing.events.forEach(out);
+    if (!existing.done) {
+      existing.subs.add(out);
+      await existing.finished;
+      existing.subs.delete(out);
+    }
+    return;
+  }
+  let finish!: () => void;
+  const entry: Shared = { at: now, done: false, keep: true, events: [], subs: new Set(), finished: new Promise<void>((r) => (finish = r)) };
+  shared.set(key, entry);
+  try {
+    await runAgentFresh(history, (e) => {
+      entry.events.push(e);
+      // the rule-based fallback (all AI busy) is not worth replaying — the next asker should get a real answer
+      if (e.t === "meta" && e.model === "rule-based") entry.keep = false;
+      emit(e);
+      entry.subs.forEach((s) => s(e));
+    }, ctx);
+  } catch (e) {
+    entry.keep = false;
+    throw e;
+  } finally {
+    entry.done = true;
+    entry.at = Date.now();
+    if (!entry.keep) shared.delete(key);
+    finish();
+  }
+}
+
+async function runAgentFresh(history: { role: "user" | "assistant"; content: string }[], emit: (e: AgentEvent) => void, ctx: AgentCtx = {}) {
   const t0 = Date.now();
   const names: string[] = [];
   const cards: Card[] = [];
@@ -820,7 +911,7 @@ async function agentLoop(history: { role: "user" | "assistant"; content: string 
         },
         (to, why) => {
           const id = `w${waitN++}`;
-          emit({ t: "step", id, name: "switch", label: `Primary AI is busy — switching to ${to}` });
+          emit({ t: "step", id, name: "switch", label: `AI model busy — switching to ${to}` });
           emit({ t: "step_done", id, ok: true, summary: `using ${to} · ${why}` });
           if (streamed) emit({ t: "reset" });
           streamed = false;

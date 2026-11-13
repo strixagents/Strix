@@ -112,9 +112,28 @@ const NATIVE: ContractScan = {
   issuer: "Native ETH", findings: [], verdict: "issuer", note: "Native ETH has no token contract.", scannedAt: 0,
 };
 
+/** An issuer-managed asset (official stock token, stablecoin…): admin powers are expected, so they are informational. */
+function asIssuer(scan: ContractScan, issuer: string): ContractScan {
+  return {
+    ...scan, issuer, verdict: "issuer",
+    findings: scan.findings.map((f) => ({ ...f, severity: "info" as const })),
+    note: `${issuer}: admin powers such as minting, pausing or upgrades are expected here — the issuer manages the asset.`,
+  };
+}
+
 export async function scanContract(address: string, symbol?: string): Promise<ContractScan> {
   const addr = address.toLowerCase();
   if (isZero(addr)) return { ...NATIVE, scannedAt: Date.now() };
+  const scan = await scanBytecode(addr, symbol);
+  // the stock-token list can still be loading when a scan is first cached — re-check it on every read
+  if (scan.isContract && scan.verdict !== "issuer") {
+    const stocks = await getStockTokens().catch(() => []);
+    if (stocks.some((s) => s.token.address.toLowerCase() === addr)) return asIssuer(scan, "Official Robinhood stock token");
+  }
+  return scan;
+}
+
+function scanBytecode(addr: string, symbol?: string): Promise<ContractScan> {
   return cached(`ct2:${addr}`, 30 * 60_000, async () => {
     const code = await rpc<string>("eth_getCode", [addr, "latest"]);
     const base = { address: addr, scannedAt: Date.now(), note: "Function names are matched against known admin signatures in the bytecode; a custom-named admin function can be missed." };
