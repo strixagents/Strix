@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 import { AlertWatcher } from "@/components/AlertWatcher";
 import { PwaRegister } from "@/components/InstallApp";
+import { PushSync } from "@/components/Notifications";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
@@ -47,6 +48,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
         <AlertWatcher />
         <PwaRegister />
+        <PushSync />
       </body>
     </html>
   );

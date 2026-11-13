@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { AppHeader } from "./AppHeader";
 import { useInstall, type Platform } from "./InstallApp";
+import { NotificationsCard } from "./Notifications";
 
 type Guide = { id: Platform; name: string; browsers: string; icon: React.ReactNode; steps: React.ReactNode[] };
 
@@ -130,6 +131,10 @@ export function DownloadPage() {
               </div>
             );
           })}
+        </section>
+
+        <section className="mx-auto mt-16 max-w-xl">
+          <NotificationsCard />
         </section>
 
         <section className="mt-16 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

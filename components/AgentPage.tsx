@@ -6,6 +6,7 @@ import { AppHeader } from "./AppHeader";
 import { AgentChat } from "./terminal/AgentChat";
 import { fmtPrice, usePoll } from "./market-ui";
 import { store, useStore, type Followed, type PriceAlert, type WatchItem } from "./store";
+import { NotificationsCard } from "./Notifications";
 
 const TOOLS: { icon: string; name: string; desc: string; href?: string }[] = [
   { icon: "⚡", name: "Actions", desc: "Sets price alerts, edits your watchlist, follows wallets" },
@@ -112,9 +113,9 @@ function MyPanel({ heading = true }: { heading?: boolean }) {
               ))}
             </ul>
           )}
-          <p className="mt-2 text-[11px] text-muted">Alerts fire with a sound + notification while any Strix tab is open.</p>
         </>
       )}
+      <div className="mt-3"><NotificationsCard compact /></div>
     </div>
   );
 }
