@@ -232,7 +232,13 @@ function markCopycats(list: Token[], reference: Token[] = []): Token[] {
 }
 
 /** Tokens whose numbers can be trusted in chain-wide totals and rankings (no copycats, no fake liquidity). */
-export const trusted = (t: Token) => !t.copycatOf && !t.fakeLiquidity;
+export const trusted = (t: Token) => !t.copycatOf && !t.fakeLiquidity && !fakeVolume(t);
+
+/** Millions in 24h volume from a handful of trades (avg trade > $50K) — the volume figure is spoofed, not real trading. */
+export function fakeVolume(t: Pick<Token, "volume" | "txns">): boolean {
+  const trades = t.txns.h24.buys + t.txns.h24.sells;
+  return t.volume.h24 >= 1_000_000 && t.volume.h24 / Math.max(trades, 1) > 50_000;
+}
 
 const INC = "include=base_token,quote_token,dex";
 
@@ -526,6 +532,7 @@ export const RISKS = {
   copycat: { label: "Possible copycat", hint: "An older token on Robinhood Chain uses the same symbol — check the contract address", w: 35 },
   wash_volume: { label: "Wash volume", hint: "24h volume is more than 50× liquidity — likely wash trading or a drained pool", w: 20 },
   spoofed_name: { label: "Disguised name", hint: "The name or symbol hides invisible Unicode characters (e.g. right-to-left override) so it can look like another token, such as USDT", w: 45 },
+  fake_volume: { label: "Fake volume", hint: "Millions in 24h volume from only a handful of trades — the volume figure is spoofed", w: 40 },
   fake_liquidity: { label: "Fake liquidity", hint: "The pool reports an impossible liquidity figure — a spoofed pool; real liquidity is unknown", w: 40 },
 } as const;
 export type RiskKey = keyof typeof RISKS;
@@ -561,6 +568,7 @@ export function risksFor(t: Token): { flags: RiskKey[]; score: number; level: "L
   if (t.txns.h24.sells > 50 && t.txns.h24.sells > 1.5 * t.txns.h24.buys) f.push("sell_pressure");
   if (t.copycatOf) f.push("copycat");
   if (t.fakeLiquidity) f.push("fake_liquidity");
+  if (fakeVolume(t)) f.push("fake_volume");
   if (HIDDEN_CHARS.test(t.symbol) || HIDDEN_CHARS.test(t.name)) f.push("spoofed_name");
   if (t.liquidity > 0 && t.volume.h24 > 50 * t.liquidity && t.volume.h24 > 10_000) f.push("wash_volume");
   const score = Math.min(100, f.reduce((s, k) => s + RISKS[k].w, 0));

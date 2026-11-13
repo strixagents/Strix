@@ -403,7 +403,7 @@ export async function runTool(name: string, args: Record<string, unknown>, ctx: 
       return {
         data: {
           network: net, totalVolume24h: Math.round(real.reduce((s, t) => s + t.volume.h24, 0)),
-          topByVolume: real.slice(0, 10).map(line), excludedCopycats: top.length - real.length, gainers: byChg.slice(0, 5).map(line), losers: byChg.slice(-5).reverse().map(line),
+          topByVolume: real.slice(0, 10).map(line), excludedSuspicious: top.length - real.length, gainers: byChg.slice(0, 5).map(line), losers: byChg.slice(-5).reverse().map(line),
           trending: trending.slice(0, 8).map(line),
         },
         summary: `${real.length} tokens · vol ${usd(real.reduce((s, t) => s + t.volume.h24, 0))}${net ? ` · block ${net.block.toLocaleString()}` : ""}`,

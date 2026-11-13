@@ -37,8 +37,8 @@ const SKIP_MINT = new Set(["WETH", "ETH", "USDG", "USDC", "USDT", "DAI", "PYUSD"
 const usd = (n: number) => (n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : n >= 1e3 ? `$${(n / 1e3).toFixed(1)}K` : `$${n.toFixed(0)}`);
 
 function push(e: Omit<RadarEvent, "id">) {
-  // one event per token+type per 30 minutes
-  const key = `${e.type}:${e.pool.toLowerCase()}:${Math.floor(e.at / (30 * 60_000))}`;
+  // a copycat launch is reported once per pool; other events at most once per token+type per 30 minutes
+  const key = e.type === "copycat" ? `copycat:${e.pool.toLowerCase()}` : `${e.type}:${e.pool.toLowerCase()}:${Math.floor(e.at / (30 * 60_000))}`;
   if (S.seen.has(key)) return;
   S.seen.add(key);
   S.events.unshift({ ...e, id: key });

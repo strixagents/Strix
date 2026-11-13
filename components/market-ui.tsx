@@ -40,6 +40,7 @@ export const RISK_LABELS: Record<string, { label: string; hint: string }> = {
   wash_volume: { label: "Wash volume", hint: "24h volume is more than 50× liquidity — likely wash trading or a drained pool" },
   spoofed_name: { label: "Disguised name", hint: "The name or symbol hides invisible characters so it can look like another token (e.g. a fake USDT)" },
   fake_liquidity: { label: "Fake liquidity", hint: "The pool reports an impossible liquidity figure — real liquidity is unknown" },
+  fake_volume: { label: "Fake volume", hint: "Millions in 24h volume from only a handful of trades — the volume figure is spoofed" },
 };
 export const toneCls = {
   bull: "border-emerald-400/30 bg-emerald-400/10 text-emerald-300",

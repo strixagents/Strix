@@ -236,7 +236,8 @@ export function buildScorecard(t: Token, info: TokenInfo | null, whales: WhaleRe
     if (info.verified) add("verified", "Verified info", "pass", "Token info verified on GeckoTerminal");
   }
   const r = risksFor(t);
-  if (r.flags.includes("wash_volume")) add("wash", "Volume quality", "fail", "24h volume far exceeds liquidity — likely wash trading");
+  if (r.flags.includes("fake_volume")) add("fakevol", "Volume quality", "fail", "Millions in 24h volume from only a handful of trades — the volume figure is spoofed");
+  else if (r.flags.includes("wash_volume")) add("wash", "Volume quality", "fail", "24h volume far exceeds liquidity — likely wash trading");
   if (whales?.washSuspect)
     add("washwallet", "Wash trading", "fail", `${Math.round(whales.topWalletShare * 100)}% of large trades come from one wallet buying and selling to itself`);
   if (whales && whales.buys + whales.sells >= 3)
