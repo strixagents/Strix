@@ -7,6 +7,8 @@ import { Frame, SectionTitle } from "@/components/landing/Frame";
 import { LiveCarousel } from "@/components/landing/LiveCarousel";
 import { HeroOrbit, ScaledOrbit } from "@/components/landing/HeroOrbit";
 import { Aurora } from "@/components/landing/Aurora";
+import CaBar from "@/components/CaBar";
+import { OFFICIAL_CA } from "@/lib/token";
 import { LiveAgentPanel, MiniScreener, LiveChainPulse, LiveRiskCheck, StatusDot } from "@/components/landing/Widgets";
 
 const faqs = [
@@ -51,7 +53,8 @@ export default function Home() {
         <Aurora className="h-full w-full" />
       </div>
 
-      {/* ───── announcement bar ───── */}
+      {/* ───── announcement bar (the official contract address once the token is live) ───── */}
+      {OFFICIAL_CA ? <CaBar ca={OFFICIAL_CA} /> : (
       <Link
         href="/agent"
         className="relative z-10 flex items-center justify-between gap-4 border-b border-white/[0.06] bg-[#0d0d0d]/60 px-5 py-3.5 text-[15px] backdrop-blur-md sm:px-8"
@@ -64,6 +67,7 @@ export default function Home() {
           Try it <span aria-hidden>→</span>
         </span>
       </Link>
+      )}
 
       <Navbar />
 
