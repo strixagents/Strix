@@ -22,7 +22,7 @@ const G = globalThis as unknown as { __strixNotify?: State };
 const S: State = (G.__strixNotify ??= { devices: new Map(), loaded: false, radarSince: Date.now(), running: false });
 
 const KEY = "strix:push:devices";
-const RADAR_TYPES = new Set(["liquidity_pull", "crash", "mint"]);
+const RADAR_TYPES = new Set(["liquidity_pull", "crash", "mint", "dev_sell"]);
 const MAX_PER_HOUR = 6;
 
 export const deviceId = (endpoint: string) => crypto.createHash("sha256").update(endpoint).digest("hex").slice(0, 24);

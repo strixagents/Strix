@@ -183,7 +183,7 @@ server.registerTool(
   {
     title: "Rug Radar",
     description: "Live Robinhood Chain red-flag feed: liquidity pulls, price crashes, sudden supply mints and copycat token launches.",
-    inputSchema: { type: z.enum(["liquidity_pull", "crash", "mint", "copycat"]).optional() },
+    inputSchema: { type: z.enum(["liquidity_pull", "crash", "mint", "copycat", "dev_sell"]).optional() },
     annotations: ro,
   },
   (a) => call("get_rug_radar", a)

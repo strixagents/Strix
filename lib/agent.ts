@@ -194,8 +194,8 @@ export const TOOLS = [
     type: "function",
     function: {
       name: "get_rug_radar",
-      description: "Live Rug Radar for Robinhood Chain: recent liquidity pulls, price crashes, sudden supply mints and copycat launches detected by Strix's background watcher. Use for 'any rugs?', 'what's dumping?', 'is anything sketchy right now?'.",
-      parameters: { type: "object", properties: { type: { type: "string", enum: ["liquidity_pull", "crash", "mint", "copycat"] } } },
+      description: "Live Rug Radar for Robinhood Chain: recent liquidity pulls, price crashes, sudden supply mints, developers selling their supply (dev_sell) and copycat launches detected by Strix's background watcher. Use for 'any rugs?', 'what's dumping?', 'is anything sketchy right now?'.",
+      parameters: { type: "object", properties: { type: { type: "string", enum: ["liquidity_pull", "crash", "mint", "copycat", "dev_sell"] } } },
     },
   },
   {

@@ -5,6 +5,7 @@ import { getRadar } from "./radar";
 import { resolvePool } from "./rhchain";
 import { shareSlug, fmtPrice, fmtUsd } from "./report";
 import { runAgent } from "./agent";
+import type { RadarEvent } from "./radar";
 
 /**
  * Strix on Telegram. Paste a contract address in any chat (or a group the bot is in) and it replies
@@ -24,6 +25,55 @@ const ADDR = /0x[a-fA-F0-9]{40}(?![a-fA-F0-9])/;
 const gradeIcon = (g: string) => (g === "A" || g === "B" ? "🟢" : g === "C" ? "🟡" : "🔴");
 
 export const telegramConfigured = () => !!process.env.TELEGRAM_BOT_TOKEN;
+
+/* ───────────── live alert subscriptions (groups that typed /alerts on) ───────────── */
+type AlertState = { chats: Set<number>; loaded: boolean; sent: Map<number, number[]> };
+const G = globalThis as unknown as { __strixTgAlerts?: AlertState };
+const A: AlertState = (G.__strixTgAlerts ??= { chats: new Set(), loaded: false, sent: new Map() });
+const KEY = "strix:tg:alertchats";
+const redisOn = () => !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+async function redis<T = unknown>(cmd: (string | number)[]): Promise<T | null> {
+  if (!redisOn()) return null;
+  const res = await fetch(process.env.UPSTASH_REDIS_REST_URL!, { method: "POST", headers: { Authorization: "Bearer " + process.env.UPSTASH_REDIS_REST_TOKEN, "Content-Type": "application/json" }, body: JSON.stringify(cmd), signal: AbortSignal.timeout(8000) }).catch(() => null);
+  return res?.ok ? ((await res.json()) as { result: T }).result : null;
+}
+async function loadAlertChats() {
+  if (A.loaded) return;
+  A.loaded = true;
+  for (const id of (await redis<string[]>(["SMEMBERS", KEY]).catch(() => null)) ?? []) A.chats.add(Number(id));
+  // a fixed alerts chat (e.g. the official community) can also be set in the environment
+  for (const id of (process.env.TELEGRAM_ALERT_CHATS ?? "").split(",").map((s) => Number(s.trim())).filter(Boolean)) A.chats.add(id);
+}
+async function setAlerts(chatId: number, on: boolean) {
+  await loadAlertChats();
+  if (on) { A.chats.add(chatId); await redis(["SADD", KEY, chatId]); }
+  else { A.chats.delete(chatId); await redis(["SREM", KEY, chatId]); }
+}
+
+const RADAR_ICON: Record<string, string> = { dev_sell: "🕵️", liquidity_pull: "🧯", crash: "📉", mint: "🖨️", copycat: "🎭" };
+/** Post a high-severity Rug Radar event to every chat that turned alerts on (max 12 per chat per hour). */
+export async function broadcastRadar(e: RadarEvent) {
+  if (!telegramConfigured()) return;
+  await loadAlertChats();
+  if (!A.chats.size) return;
+  const html = [
+    `${RADAR_ICON[e.type] ?? "🚨"} <b>Rug Radar · ${esc(e.symbol)}</b>`,
+    `<b>${esc(e.title)}</b>`,
+    esc(e.detail),
+    "",
+    `📄 <a href="${SITE}/t/${e.pool}">Report</a> · <a href="${SITE}/radar">Radar</a> · <code>${e.token}</code>`,
+  ].join("\n");
+  const now = Date.now();
+  for (const chat of A.chats) {
+    const log = (A.sent.get(chat) ?? []).filter((x) => now - x < 3_600_000);
+    if (log.length >= 12) continue;
+    log.push(now);
+    A.sent.set(chat, log);
+    const r = (await tg("sendMessage", { chat_id: chat, text: html, parse_mode: "HTML", link_preview_options: { is_disabled: true } })) as { ok?: boolean; error_code?: number } | null;
+    // the bot was removed or blocked: stop sending there
+    if (r && r.ok === false && (r.error_code === 403 || r.error_code === 400)) await setAlerts(chat, false);
+  }
+}
 
 export async function tg(method: string, body: Record<string, unknown>) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -107,6 +157,7 @@ const HELP = [
   "/launches — newest launches, graded",
   "/radar — latest rug alerts",
   "/ask &lt;question&gt; — ask the Strix agent",
+  "/alerts on — live rug alerts in this chat (dev dumps, liquidity pulls, crashes)",
   "",
   `Add me to a group and I'll check every contract address people paste. ${SITE}`,
 ].join("\n");
@@ -131,6 +182,13 @@ export async function replyFor(u: TgUpdate): Promise<{ chatId: number; replyTo: 
     else if (name === "launches" || name === "new") html = await launchesReply();
     else if (name === "radar") html = await radarReply();
     else if (name === "ask") html = a ? await askReply(a) : "Ask me anything: <code>/ask is PONS safe?</code>";
+    else if (name === "alerts") {
+      const off = /^(off|stop|0|no)$/i.test(a);
+      await setAlerts(m.chat.id, !off);
+      html = off
+        ? "🔕 Live rug alerts are <b>off</b> for this chat."
+        : "🔔 Live rug alerts are <b>on</b>. I'll post here when a developer dumps, liquidity is pulled, a price crashes or supply is minted on Robinhood Chain.\n\nTurn off with <code>/alerts off</code>.";
+    }
     else if (group) return null;
     else html = HELP;
   } else if (ca) html = await tokenReply(ca);

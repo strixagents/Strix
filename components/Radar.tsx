@@ -6,13 +6,14 @@ import { AppHeader } from "./AppHeader";
 import { TokenIcon, fmtPrice, fmtUsd, usePoll } from "./market-ui";
 
 type Ev = {
-  id: string; type: "liquidity_pull" | "crash" | "mint" | "copycat"; severity: "high" | "medium";
+  id: string; type: "liquidity_pull" | "crash" | "mint" | "copycat" | "dev_sell"; severity: "high" | "medium";
   at: number; symbol: string; name: string; pool: string; token: string; image: string | null;
   title: string; detail: string; liquidity: number; price: number;
 };
 type Resp = { events: Ev[]; monitoringSince: number; lastScan: number; scans: number; watching: number; error?: string };
 
 const TYPES: { k: Ev["type"]; label: string; icon: string; hint: string }[] = [
+  { k: "dev_sell", label: "Dev sold", icon: "🕵️", hint: "The developer of a new launch sold 2%+ of the supply" },
   { k: "liquidity_pull", label: "Liquidity pulled", icon: "🧯", hint: "Pool liquidity fell ≥50% from its high in the last hour" },
   { k: "crash", label: "Price crash", icon: "📉", hint: "Price fell ≥50% within an hour" },
   { k: "mint", label: "Supply minted", icon: "🖨️", hint: "New tokens created from nothing (≥2% of supply)" },

@@ -14,7 +14,7 @@ import { getStockTokens } from "./stocks";
  */
 
 export type RadarEvent = {
-  id: string; type: "liquidity_pull" | "crash" | "mint" | "copycat"; severity: "high" | "medium";
+  id: string; type: "liquidity_pull" | "crash" | "mint" | "copycat" | "dev_sell"; severity: "high" | "medium";
   at: number; symbol: string; name: string; pool: string; token: string; image: string | null;
   title: string; detail: string; liquidity: number; price: number;
 };
@@ -22,7 +22,7 @@ export type RadarEvent = {
 type Sample = { at: number; liq: number; price: number };
 type State = {
   started: number; lastScan: number; scans: number; watching: number;
-  samples: Map<string, Sample[]>; events: RadarEvent[]; seen: Set<string>; lastMintBlock: number; running: boolean; timer?: ReturnType<typeof setInterval>; current?: Promise<void>;
+  samples: Map<string, Sample[]>; devHold?: Map<string, number>; events: RadarEvent[]; seen: Set<string>; lastMintBlock: number; running: boolean; timer?: ReturnType<typeof setInterval>; current?: Promise<void>;
 };
 
 const G = globalThis as unknown as { __strixRadar?: State };
@@ -36,6 +36,9 @@ const ZERO_TOPIC = "0x" + "0".repeat(64);
 const SKIP_MINT = new Set(["WETH", "ETH", "USDG", "USDC", "USDT", "DAI", "PYUSD", "USD1", "USDE"]);
 const usd = (n: number) => (n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : n >= 1e3 ? `$${(n / 1e3).toFixed(1)}K` : `$${n.toFixed(0)}`);
 
+/** High-severity events also go out to Telegram groups that turned alerts on. */
+const BROADCAST = new Set(["liquidity_pull", "crash", "mint", "dev_sell"]);
+
 function push(e: Omit<RadarEvent, "id">) {
   // a copycat launch is reported once per pool; other events at most once per token+type per 30 minutes
   const key = e.type === "copycat" ? `copycat:${e.pool.toLowerCase()}` : `${e.type}:${e.pool.toLowerCase()}:${Math.floor(e.at / (30 * 60_000))}`;
@@ -43,6 +46,7 @@ function push(e: Omit<RadarEvent, "id">) {
   S.seen.add(key);
   S.events.unshift({ ...e, id: key });
   S.events = S.events.slice(0, 300);
+  if (e.severity === "high" && BROADCAST.has(e.type)) import("./telegram").then((m) => m.broadcastRadar({ ...e, id: key })).catch(() => {});
 }
 
 function scan(): Promise<void> {
@@ -129,6 +133,7 @@ async function doScan() {
         });
       }
     }
+    await devWatch().catch(() => {});
     S.lastScan = Date.now();
     S.scans++;
   } finally {
@@ -148,4 +153,39 @@ export async function getRadar() {
   if (!S.timer) startRadar();
   if (!S.scans) await scan().catch(() => {});
   return { events: S.events, monitoringSince: S.started, lastScan: S.lastScan, scans: S.scans, watching: S.watching };
+}
+
+/**
+ * Dev dumps: for every recent launch whose developer still held at least 1% of supply, compare the
+ * developer's balance with the previous scan. A drop of 2+ points of supply is a "dev_sell" event.
+ */
+async function devWatch() {
+  const { getLaunches } = await import("./launches");
+  const { launches } = await getLaunches().catch(() => ({ launches: [] as Awaited<ReturnType<typeof getLaunches>>["launches"] }));
+  const watch = launches.filter((l) => l.dev && (l.dev.holdingPct >= 1 || S.devHold?.has(l.dev.address + ":" + l.token.address.toLowerCase())));
+  if (!watch.length) return;
+  S.devHold ??= new Map();
+  const calls = watch.flatMap((l) => [
+    { target: l.token.address, data: sel.balanceOf + l.dev!.address.slice(2).toLowerCase().padStart(64, "0") },
+    { target: l.token.address, data: "0x18160ddd" },
+  ]);
+  const out = await multicall(calls).catch(() => [] as (string | null)[]);
+  watch.forEach((l, i) => {
+    const bal = toBig(out[i * 2] ?? null), supply = toBig(out[i * 2 + 1] ?? null);
+    if (supply <= 0n) return;
+    const pct = Number((bal * 1_000_000n) / supply) / 10_000;
+    const key = l.dev!.address + ":" + l.token.address.toLowerCase();
+    const prev = S.devHold!.get(key);
+    S.devHold!.set(key, pct);
+    if (prev == null) return;
+    const drop = prev - pct;
+    if (drop < 2) return;
+    const t = l.token;
+    push({
+      at: Date.now(), symbol: t.symbol, name: t.name, pool: t.pool, token: t.address, image: t.image, liquidity: t.liquidity, price: t.price,
+      type: "dev_sell", severity: drop >= 5 ? "high" : "medium",
+      title: `Developer sold ${drop.toFixed(1)}% of supply`,
+      detail: `Dev wallet ${l.dev!.address.slice(0, 6)}…${l.dev!.address.slice(-4)} went from ${prev.toFixed(1)}% to ${pct.toFixed(1)}% of supply since the last scan.`,
+    });
+  });
 }
