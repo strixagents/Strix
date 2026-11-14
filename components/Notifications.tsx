@@ -38,11 +38,19 @@ async function post(action: string, sub: PushSubscription, extra: Record<string,
   return j;
 }
 const LAST_KEY = "strix.push.last";
-const payload = () => ({ alerts: store.alerts(), radar: readRadar() });
+const BRIEF_KEY = "strix.push.brief";
+const readBrief = () => {
+  try {
+    return localStorage.getItem(BRIEF_KEY) !== "0";
+  } catch {
+    return true;
+  }
+};
+const payload = () => ({ alerts: store.alerts(), radar: readRadar(), brief: readBrief(), watch: store.watch().map((w) => ({ pool: w.pool, symbol: w.symbol })) });
 /** Register with the server — skipped when nothing changed since a sync less than 30 minutes ago. */
 async function register(sub: PushSubscription, force = false) {
   const body = payload();
-  const hash = JSON.stringify([sub.endpoint, body.radar, body.alerts.map((a) => [a.id, a.price, a.dir])]);
+  const hash = JSON.stringify([sub.endpoint, body.radar, body.brief, body.watch.map((w) => w.pool), body.alerts.map((a) => [a.id, a.price, a.dir])]);
   let last: { h?: string; at?: number } = {};
   try {
     last = JSON.parse(localStorage.getItem(LAST_KEY) || "{}");
@@ -73,7 +81,7 @@ export function PushSync() {
       }, 500);
     };
     sync();
-    const onStore = (e: Event) => (e as CustomEvent).detail === "alerts" && sync();
+    const onStore = (e: Event) => ["alerts", "watch"].includes((e as CustomEvent).detail) && sync();
     window.addEventListener("strix:store", onStore);
     window.addEventListener("strix:push-radar", sync);
     return () => {
@@ -86,15 +94,15 @@ export function PushSync() {
 }
 
 export function usePush() {
-  const [state, setState] = useState<{ ready: boolean; on: boolean; radar: boolean; permission: NotificationPermission | "unsupported"; available: boolean }>({ ready: false, on: false, radar: true, permission: "default", available: false });
+  const [state, setState] = useState<{ ready: boolean; on: boolean; radar: boolean; brief: boolean; permission: NotificationPermission | "unsupported"; available: boolean }>({ ready: false, on: false, radar: true, brief: true, permission: "default", available: false });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const cfg = (await fetch("/api/push").then((r) => r.json()).catch(() => ({ enabled: false }))) as { enabled: boolean };
-    if (!supported()) return setState({ ready: true, on: false, radar: true, permission: "unsupported", available: cfg.enabled });
+    if (!supported()) return setState({ ready: true, on: false, radar: true, brief: true, permission: "unsupported", available: cfg.enabled });
     const sub = await currentSub().catch(() => null);
-    setState({ ready: true, on: !!sub && Notification.permission === "granted", radar: readRadar(), permission: Notification.permission, available: cfg.enabled });
+    setState({ ready: true, on: !!sub && Notification.permission === "granted", radar: readRadar(), brief: readBrief(), permission: Notification.permission, available: cfg.enabled });
   }, []);
   useEffect(() => {
     refresh();
@@ -142,7 +150,28 @@ export function usePush() {
     window.dispatchEvent(new Event("strix:push-radar"));
     setState((s) => ({ ...s, radar: on }));
   };
-  return { ...state, busy, msg, enable, disable, setRadar };
+  const setBrief = (on: boolean) => {
+    try {
+      localStorage.setItem(BRIEF_KEY, on ? "1" : "0");
+    } catch {}
+    window.dispatchEvent(new Event("strix:push-radar"));
+    setState((s) => ({ ...s, brief: on }));
+  };
+  const sendBrief = async () => {
+    const sub = await currentSub();
+    if (!sub) return;
+    setBusy(true);
+    try {
+      await register(sub, true);
+      await post("brief", sub);
+      setMsg("Morning brief sent — check your notifications.");
+    } catch (e) {
+      setMsg((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return { ...state, busy, msg, enable, disable, setRadar, setBrief, sendBrief };
 }
 
 /** Compact card: turn notifications on/off and choose Rug Radar alerts. */
@@ -161,7 +190,7 @@ export function NotificationsCard({ compact = false }: { compact?: boolean }) {
         {p.on && <span className="ml-auto rounded-full border border-emerald-400/30 px-2 py-0.5 font-mono text-[10px] text-emerald-300">ON</span>}
       </div>
       <p className={`mt-1.5 text-muted ${compact ? "text-[11px]" : "text-sm"} leading-relaxed`}>
-        Price alerts and serious Rug Radar events reach you even when Strix is closed.
+        Price alerts, serious Rug Radar events and a daily morning brief reach you even when Strix is closed.
       </p>
       {iosBrowser ? (
         <p className={`mt-3 ${compact ? "text-[11px]" : "text-sm"} text-amber`}>
@@ -182,6 +211,15 @@ export function NotificationsCard({ compact = false }: { compact?: boolean }) {
               <input type="checkbox" checked={p.radar} onChange={(e) => p.setRadar(e.target.checked)} className="accent-amber" />
               Rug Radar alerts
             </label>
+            <label className="flex cursor-pointer items-center gap-2 text-xs text-zinc-300">
+              <input type="checkbox" checked={p.brief} onChange={(e) => p.setBrief(e.target.checked)} className="accent-amber" />
+              Morning brief (07:00 WIB)
+            </label>
+            {p.on && (
+              <button type="button" onClick={p.sendBrief} disabled={p.busy} className="text-xs text-amber underline-offset-2 hover:underline disabled:opacity-50">
+                Preview brief
+              </button>
+            )}
           </div>
           {p.msg && <p className={`mt-2 ${compact ? "text-[11px]" : "text-sm"} text-zinc-400`}>{p.msg}</p>}
         </>

@@ -191,6 +191,9 @@ function grade(t: Token, contract: Launch["contract"], sn: Snipers, dev: Dev, se
     else if (dev.movedPct >= 3) warn(10, `Developer has moved or sold ${dev.movedPct.toFixed(1)}% of supply`);
   }
   if (sellable === true) reasons.push({ tone: "good", text: "Sell test passed — a buyer can move tokens back into the pool" });
+  if (!t.fakeLiquidity && t.liquidity >= 1_000_000 && (t.ageHours ?? 99) < 24 && !t.copycatOf)
+    warn(25, `Unusually high liquidity for a brand-new token (${money(t.liquidity)}) — verify it is real`);
+  if (!sn && !dev && sellable === null) warn(15, "Launch data not readable yet — first-minute buyers, developer and sell test unknown");
   const r = risksFor(t);
   if (r.flags.includes("wash_volume")) warn(15, "Volume far exceeds liquidity — likely wash trading");
   if (r.flags.includes("spoofed_name")) bad(40, "Disguised name (hidden characters)");
@@ -204,7 +207,7 @@ const LIMIT = 24;
 
 /** The newest launches with their launch checks (on-chain reads run in parallel and are cached). */
 export async function getLaunches(limit = LIMIT): Promise<{ launches: Launch[]; scannedAt: number }> {
-  return cached("launches:v8", 60_000, async () => {
+  return cached("launches:v9", 60_000, async () => {
     const pools = (await getNewPools())
       .filter((t) => (t.ageHours ?? 99) <= 24 && !NOT_LAUNCHES.has(t.symbol.toUpperCase()))
       .sort((a, b) => (a.ageHours ?? 99) - (b.ageHours ?? 99))

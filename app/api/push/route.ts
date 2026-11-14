@@ -1,6 +1,6 @@
 import { rateLimit } from "@/lib/cache";
 import { pushConfigured, vapidPublicKey, type PushSub } from "@/lib/push";
-import { removeDevice, sendTest, upsertDevice, type DeviceAlert } from "@/lib/notify";
+import { removeDevice, sendBriefTo, sendTest, upsertDevice, type DeviceAlert, type DeviceWatch } from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -31,12 +31,17 @@ function readAlerts(v: unknown): DeviceAlert[] {
     .map((a) => ({ id: String(a.id ?? `${a.pool}-${a.price}`).slice(0, 64), pool: a.pool, symbol: String(a.symbol).slice(0, 24), price: +a.price, dir: a.dir }));
 }
 
-/** POST { action: "subscribe" | "unsubscribe" | "test", sub, alerts?, radar? } */
+function readWatch(v: unknown): DeviceWatch[] {
+  if (!Array.isArray(v)) return [];
+  return v.slice(0, 8).filter((w) => w && /^0x[0-9a-fA-F]{40,64}$/.test(w.pool) && typeof w.symbol === "string").map((w) => ({ pool: w.pool, symbol: String(w.symbol).slice(0, 24) }));
+}
+
+/** POST { action: "subscribe" | "unsubscribe" | "test" | "brief", sub, alerts?, radar?, watch?, brief? } */
 export async function POST(req: Request) {
   if (!pushConfigured()) return Response.json({ error: "Push notifications are not configured on this server." }, { status: 503 });
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "local";
   if (!rateLimit(`push:${ip}`, 40, 10 * 60_000)) return Response.json({ error: "Too many requests — try again in a few minutes." }, { status: 429 });
-  const body = (await req.json().catch(() => ({}))) as { action?: string; sub?: unknown; alerts?: unknown; radar?: unknown };
+  const body = (await req.json().catch(() => ({}))) as { action?: string; sub?: unknown; alerts?: unknown; radar?: unknown; watch?: unknown; brief?: unknown };
   const sub = readSub(body.sub);
   if (!sub) return Response.json({ error: "Invalid push subscription." }, { status: 400 });
   if (body.action === "unsubscribe") {
@@ -47,6 +52,10 @@ export async function POST(req: Request) {
     if (!rateLimit(`pushtest:${ip}`, 5, 10 * 60_000)) return Response.json({ error: "Too many test notifications." }, { status: 429 });
     return Response.json(await sendTest(sub.endpoint));
   }
-  const r = await upsertDevice(sub, readAlerts(body.alerts), body.radar !== false);
+  if (body.action === "brief") {
+    if (!rateLimit("pushbrief:" + ip, 3, 10 * 60_000)) return Response.json({ error: "Too many briefs." }, { status: 429 });
+    return Response.json(await sendBriefTo(sub.endpoint));
+  }
+  const r = await upsertDevice(sub, readAlerts(body.alerts), body.radar !== false, readWatch(body.watch), body.brief !== false);
   return Response.json({ ok: true, ...r });
 }

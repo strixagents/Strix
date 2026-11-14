@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
-import { getPrices } from "./rhchain";
+import { getPool, getPrices } from "./rhchain";
+import { getLaunches } from "./launches";
 import { getRadar, type RadarEvent } from "./radar";
 import { pushConfigured, sendPush, type Note, type PushSub } from "./push";
 
@@ -13,7 +14,8 @@ import { pushConfigured, sendPush, type Note, type PushSub } from "./push";
  */
 
 export type DeviceAlert = { id: string; pool: string; symbol: string; price: number; dir: "above" | "below" };
-type Device = { id: string; sub: PushSub; alerts: DeviceAlert[]; radar: boolean; created: number; seen: number; sent: number[] };
+export type DeviceWatch = { pool: string; symbol: string };
+type Device = { id: string; sub: PushSub; alerts: DeviceAlert[]; radar: boolean; created: number; seen: number; sent: number[]; watch?: DeviceWatch[]; brief?: boolean; briefDay?: string };
 
 type State = { devices: Map<string, Device>; loaded: boolean; timer?: ReturnType<typeof setInterval>; radarSince: number; running: boolean };
 const G = globalThis as unknown as { __strixNotify?: State };
@@ -53,11 +55,11 @@ async function load() {
 }
 
 /* ───────────── registration ───────────── */
-export async function upsertDevice(sub: PushSub, alerts: DeviceAlert[], radar: boolean) {
+export async function upsertDevice(sub: PushSub, alerts: DeviceAlert[], radar: boolean, watch: DeviceWatch[] = [], brief = true) {
   await load();
   const id = deviceId(sub.endpoint);
   const cur = S.devices.get(id);
-  const d: Device = { id, sub, alerts: alerts.slice(0, 30), radar, created: cur?.created ?? Date.now(), seen: Date.now(), sent: cur?.sent ?? [] };
+  const d: Device = { id, sub, alerts: alerts.slice(0, 30), radar, created: cur?.created ?? Date.now(), seen: Date.now(), sent: cur?.sent ?? [], watch: watch.slice(0, 8), brief, briefDay: cur?.briefDay };
   S.devices.set(id, d);
   await save(d);
   startNotifier();
@@ -97,6 +99,49 @@ async function deliver(d: Device, note: Note, ignoreLimit = false): Promise<bool
 
 const money = (n: number) => (n >= 1 ? n.toLocaleString("en-US", { maximumFractionDigits: 4 }) : String(Number(n.toPrecision(4))));
 
+const BRIEF_HOUR_UTC = 0; // 07:00 in Jakarta
+const pct = (n: number) => (n >= 0 ? "+" : "") + n.toFixed(1) + "%";
+const plural = (n: number, w: string, ws = w + "s") => n + " " + (n === 1 ? w : ws);
+
+/** The morning brief: your watchlist's 24h moves and what the radar and launch scanner caught overnight. */
+async function buildBrief(watch: DeviceWatch[]): Promise<Note> {
+  const moves: string[] = [];
+  for (const w of watch.slice(0, 4)) {
+    const t = await getPool(w.pool).catch(() => null);
+    if (t) moves.push(t.symbol + " " + pct(t.change.h24));
+  }
+  const radar = await getRadar().catch(() => null);
+  const since = Date.now() - 12 * 3_600_000;
+  const night = (radar?.events ?? []).filter((e) => e.at >= since);
+  const pulls = night.filter((e) => e.type === "liquidity_pull").length;
+  const crashes = night.filter((e) => e.type === "crash").length;
+  const launches = (await getLaunches().catch(() => null))?.launches ?? [];
+  const bundled = launches.filter((l) => l.reasons.some((r) => r.text.startsWith("Bundled launch"))).length;
+  const clean = launches.filter((l) => l.grade === "A" && !l.token.copycatOf).length;
+  const overnight = "Overnight: " + plural(pulls, "liquidity pull") + ", " + plural(crashes, "crash", "crashes") + ", " + plural(bundled, "bundled launch", "bundled launches") + (clean ? ", " + plural(clean, "launch", "launches") + " graded A" : "") + ".";
+  const day = new Date().toISOString().slice(0, 10);
+  return { title: "gm ☀️ Your Strix morning brief", body: moves.length ? moves.join(" · ") + ". " + overnight : overnight, url: "/agent?q=%2Fbrief&source=push", tag: "brief-" + day };
+}
+
+export async function sendBriefTo(endpoint: string) {
+  await load();
+  const d = S.devices.get(deviceId(endpoint));
+  if (!d) return { ok: false, reason: "not registered" };
+  return { ok: await deliver(d, await buildBrief(d.watch ?? []), true) };
+}
+
+async function morningBriefs(devices: Device[]) {
+  const now = new Date();
+  if (now.getUTCHours() !== BRIEF_HOUR_UTC) return;
+  const day = now.toISOString().slice(0, 10);
+  for (const d of devices) {
+    if (d.brief === false || d.briefDay === day || !S.devices.has(d.id)) continue;
+    d.briefDay = day;
+    await deliver(d, await buildBrief(d.watch ?? []), true);
+    await save(d);
+  }
+}
+
 async function tick() {
   if (S.running || !pushConfigured()) return;
   S.running = true;
@@ -123,6 +168,8 @@ async function tick() {
         await save(d);
       }
     }
+
+    await morningBriefs(devices).catch(() => {});
 
     // Rug Radar — new high-severity liquidity pulls, crashes and mints
     const radar = await getRadar().catch(() => null);
