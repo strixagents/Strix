@@ -193,6 +193,14 @@ export const TOOLS = [
   {
     type: "function",
     function: {
+      name: "get_holder_map",
+      description: "Holder bubble map of a token: the top holders' live shares and which of them are LINKED on-chain (sent each other tokens, got tokens from the same wallet, received them in one transaction, or bought in the same block at launch). Use for 'who holds X?', 'is X held by one person?', 'bundled wallets', 'insiders', 'bubble map'.",
+      parameters: { type: "object", properties: { token: { type: "string", description: "Token address, pool or symbol" } }, required: ["token"] },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "get_rug_radar",
       description: "Live Rug Radar for Robinhood Chain: recent liquidity pulls, price crashes, sudden supply mints, developers selling their supply (dev_sell) and copycat launches detected by Strix's background watcher. Use for 'any rugs?', 'what's dumping?', 'is anything sketchy right now?'.",
       parameters: { type: "object", properties: { type: { type: "string", enum: ["liquidity_pull", "crash", "mint", "copycat", "dev_sell"] } } },
@@ -531,6 +539,22 @@ export async function runTool(name: string, args: Record<string, unknown>, ctx: 
       const n = await getNews(args.topic ? String(args.topic) : undefined, 8);
       return { data: n.map(({ title, date, source }) => ({ title, date, source })), summary: `${n.length} headlines` };
     }
+    case "get_holder_map": {
+      const { getBubbleMap } = await import("./bubbles");
+      const m = await getBubbleMap(String(args.token ?? ""));
+      const top = m.nodes.slice(0, 10).map((n) => ({ address: n.address, pct: +n.pct.toFixed(3), kind: n.label ?? n.kind, linkedGroup: n.cluster }));
+      return {
+        data: {
+          token: m.token.symbol, coverage: m.coverage.complete ? "every transfer since launch" : `last ${m.coverage.hours}h in full + ${m.coverage.samples} older windows`,
+          summary: Object.fromEntries(Object.entries(m.summary).map(([k, v]) => [k, +v.toFixed(2)])),
+          linkedGroups: m.clusters.slice(0, 6).map((c) => ({ wallets: c.wallets.length, pct: +c.pct.toFixed(2), why: c.reasons })),
+          topHolders: top,
+          map: `https://strixagents.com/bubbles?token=${m.token.address}`,
+          note: "Links are on-chain relationships, not proof that one person owns the wallets.",
+        },
+        summary: `${m.nodes.length} holders · ${m.clusters.length} linked groups`,
+      };
+    }
     case "get_rug_radar": {
       const r = await getRadar();
       const ev = r.events.filter((e) => !args.type || e.type === args.type).slice(0, 12);
@@ -571,6 +595,7 @@ const LABELS: Record<string, (a: Record<string, unknown>) => string> = {
   get_token_scorecard: (a) => `Running safety scorecard on ${a.token} (holders, honeypot, dev wallet…)`,
   get_whale_activity: (a) => `Tracking whale wallets & large trades on ${a.token}`,
   get_stock_premiums: (a) => `Comparing ${a.ticker ?? "stock"} tokens with the real share price`,
+  get_holder_map: (a) => `Drawing the holder bubble map for ${a.token} — linked wallets, bundles`,
   get_rug_radar: () => "Checking the Rug Radar (liquidity pulls, crashes, mints, copycats)",
   get_smart_money: () => "Ranking smart-money wallets (bots removed)",
   scan_contract: (a) => `X-raying the ${a.token} contract bytecode (mint, blacklist, pause, upgrades…)`,
@@ -594,6 +619,7 @@ Rules:
 - Never call a new launch "safe": a launch grade only means fewer red flags so far. Say "fewest red flags" and remind that brand-new tokens are high risk. A copycat is never a good pick.
 - When a tool returns a "report" link, end safety answers with it as a Markdown link (e.g. "Full report: [strixagents.com/t/PONS](https://strixagents.com/t/PONS)") so the user can share it.
 - You are a research agent, not a trading bot. Never tell the user what to buy or sell, never give entry / stop-loss / take-profit prices, position sizes or "long/short" setups, and never call anything "recommended" / "rekomendasi". If asked for a trade plan, say you only research and explain on-chain data and risk.
+- Holder questions ("who holds X", one player, insiders, bundled wallets, bubble map) → get_holder_map; end with its map link. Linked wallets are a warning sign, not proof of one owner.
 - Safety questions ("aman ga?", rug, holder, trust) → get_token_scorecard. Whale / smart-money questions → get_whale_activity. For a full token review, call analyze_token AND get_token_scorecard.
 - Stock tokens vs real shares → get_stock_premiums. A wallet address (0x + 40 hex) → scan_wallet. If a wallet looksLikeBot, say it is a bot/relayer and should not be copied.
 - You can ACT for the user: set_price_alert ("alert me if…", "kasih tau kalau…"), manage_watchlist ("watch X", "pantau X"), follow_wallet. Do it when asked, then confirm in one line what was set. Percent requests ("if it drops 10%") → pass percent: -10.

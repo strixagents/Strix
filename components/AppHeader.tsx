@@ -14,6 +14,7 @@ export const APP_NAV = [
   { href: "/wallet", label: "Wallet" },
   { href: "/smart-money", label: "Smart money" },
   { href: "/launches", label: "Launches" },
+  { href: "/bubbles", label: "Bubble Map" },
   { href: "/radar", label: "Rug Radar" },
   { href: "/docs", label: "Docs" },
   { href: "/download", label: "App" },
@@ -45,8 +46,8 @@ export function AppHeader() {
         <AppNav className="hidden sm:flex" />
         <div className="ml-auto flex items-center gap-2">
           <SearchButton />
-          <Link href="/me" className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm text-zinc-300 transition hover:text-white" aria-label="My Strix">★<span className="hidden sm:inline">My Strix</span></Link>
-          <span className="hidden md:inline"><NetworkBadge /></span>
+          <Link href="/me" className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm text-zinc-300 transition hover:text-white" aria-label="My Strix">★<span className="hidden sm:inline">My Strix</span></Link>
+          <span className="hidden 2xl:inline"><NetworkBadge /></span>
         </div>
       </div>
       <AppNav className="overflow-x-auto px-3 pb-2 sm:hidden" />

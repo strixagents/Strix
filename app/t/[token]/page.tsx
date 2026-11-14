@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { ShareReport } from "@/components/ShareReport";
 import { ReportChart, WatchButton } from "@/components/ReportTools";
+import { HolderMap } from "@/components/HolderMap";
 import { fmtAge, fmtPrice, fmtUsd, getReport, gradeTone, shareSlug } from "@/lib/report";
 import { links } from "@/lib/rhchain";
 
@@ -104,6 +105,18 @@ export default async function TokenReport({ params }: Props) {
         {/* live chart + price alerts */}
         <section className="mt-5">
           <ReportChart pool={t.pool} symbol={t.symbol} price={t.price} />
+        </section>
+
+        {/* holder bubble map */}
+        <section className="mt-5">
+          <div className="mb-3 flex items-end justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">Holder bubble map</h2>
+              <p className="text-sm text-muted">Top holders, with linked wallets grouped by color.</p>
+            </div>
+            <Link href={`/bubbles?token=${t.pool}`} className="text-sm text-muted hover:text-white">Full screen ↗</Link>
+          </div>
+          <HolderMap token={t.pool} />
         </section>
 
         {/* contract x-ray */}

@@ -65,6 +65,7 @@ export function QuickSearch() {
   const items: Item[] = isAddr(s)
     ? [
         { key: "t", title: "Safety report for this token", sub: s, href: `/t/${s}`, icon: "🛡️" },
+        { key: "b", title: "Holder bubble map", sub: "Who really holds it — linked wallets grouped", href: `/bubbles?token=${s}`, icon: "🫧" },
         { key: "w", title: "Scan this wallet", sub: "Holdings, risk per token, 24h activity", href: `/wallet?address=${s}`, icon: "👛" },
         { key: "c", title: "Contract X-ray", sub: "Admin powers in the bytecode", href: `/agent?q=${encodeURIComponent(`/contract ${s}`)}`, icon: "🔬" },
       ]
@@ -130,10 +131,10 @@ export function QuickSearch() {
 /** Small "Search ⌘K" button for headers. */
 export function SearchButton({ className = "" }: { className?: string }) {
   return (
-    <button type="button" onClick={openSearch} className={`inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm text-zinc-400 transition hover:text-white ${className}`} aria-label="Search">
+    <button type="button" onClick={openSearch} className={`inline-flex items-center gap-2 whitespace-nowrap rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm text-zinc-400 transition hover:text-white ${className}`} aria-label="Search">
       <span>⌕</span>
       <span className="hidden sm:inline">Search</span>
-      <kbd className="hidden rounded border border-white/15 px-1 font-mono text-[10px] lg:inline">Ctrl K</kbd>
+      <kbd className="hidden whitespace-nowrap rounded border border-white/15 px-1 font-mono text-[10px] xl:inline">Ctrl K</kbd>
     </button>
   );
 }
