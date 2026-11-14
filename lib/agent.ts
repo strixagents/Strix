@@ -8,6 +8,8 @@ import { getSmartMoney } from "./smartmoney";
 import { isAddress } from "./evm";
 import { scanContract } from "./contract";
 import { readImage, visionSummary } from "./vision";
+import { getLaunches } from "./launches";
+import { shareSlug } from "./report";
 import {
   CHAIN, INTERVALS, RISKS, SIGNALS, getCandles, getNetworkStatus, getNewPools, getPool, getTopTokens, getTrending,
   getPrices, links, resolvePool, risksFor, searchTokens, signalsFor, trusted, type Interval, type SignalKey, type Token,
@@ -131,8 +133,9 @@ export const TOOLS = [
     type: "function",
     function: {
       name: "get_new_launches",
-      description: "Newest pools/token launches on Robinhood Chain with liquidity and risk flags. Use for 'token baru', 'new launches', 'fresh pairs'.",
-      parameters: { type: "object", properties: {} },
+      description:
+        "Launch Scanner: every token launched on Robinhood Chain in the last 24h with an early A–F launch grade and its reasons — admin powers in the contract, bundled launches / first-minute snipers (wallets and % of supply), copycats, fake or empty liquidity, spoofed volume. Use for 'token baru', 'new launches', 'any safe new tokens?', 'which launches are bundled?'.",
+      parameters: { type: "object", properties: { only: { type: "string", enum: ["all", "safe", "risky"], description: "safe = grades A–B and not a copycat (fewest red flags), risky = D–F or copycats" } } },
     },
   },
   {
@@ -423,8 +426,24 @@ export async function runTool(name: string, args: Record<string, unknown>, ctx: 
       return { data: { list, scanned: tokens.length, matches: hits }, summary: `${hits.length}/${tokens.length} tokens matched` };
     }
     case "get_new_launches": {
-      const n = await getNewPools();
-      return { data: n.slice(0, 15).map(brief), summary: `${n.length} new pools` };
+      const { launches } = await getLaunches();
+      const only = String(args.only ?? "all");
+      const pick = launches.filter((l) => (only === "safe" ? ["A", "B"].includes(l.grade) && !l.token.copycatOf : only === "risky" ? ["D", "F"].includes(l.grade) || !!l.token.copycatOf : true));
+      const bundled = launches.filter((l) => l.reasons.some((r) => r.text.startsWith("Bundled launch"))).length;
+      return {
+        data: {
+          scanned: launches.length,
+          bundled,
+          launches: pick.slice(0, 12).map((l) => ({
+            symbol: l.token.symbol, name: l.token.name, tokenAddress: l.token.address, ageMinutes: Math.round((l.token.ageHours ?? 0) * 60),
+            liquidityUsd: Math.round(l.token.liquidity), priceUsd: l.token.price, launchGrade: l.grade, launchScore: l.score,
+            firstMinute: l.snipers ? { wallets: l.snipers.buyers, supplyPct: +l.snipers.sharePct.toFixed(1) } : "unknown",
+            contract: l.contract?.verdict ?? "unknown", reasons: l.reasons.map((r) => r.text),
+            report: `https://strixagents.com/t/${l.token.pool}`,
+          })),
+        },
+        summary: `${launches.length} launches · ${bundled} bundled · ${launches.filter((l) => ["A", "B", "C"].includes(l.grade)).length} graded A–C`,
+      };
     }
     case "search_token": {
       const r = await searchTokens(String(args.query));
@@ -438,6 +457,7 @@ export async function runTool(name: string, args: Record<string, unknown>, ctx: 
           symbol: r.token.symbol, tokenAddress: r.token.address, pool: r.token.pool,
           scorecard: r.scorecard,
           holders: r.info?.holders ?? null, developerHoldingPct: r.info?.developerHoldingPct ?? null, honeypot: r.info?.honeypot ?? "unknown",
+          report: `https://strixagents.com/t/${encodeURIComponent(shareSlug(r.token))}`,
           socials: r.info ? { websites: r.info.websites, twitter: r.info.twitter, telegram: r.info.telegram } : null,
         },
         summary: `${r.token.symbol}: ${r.scorecard.grade} (${r.scorecard.score}/100) · ${r.scorecard.verdict}`,
@@ -545,7 +565,7 @@ const LABELS: Record<string, (a: Record<string, unknown>) => string> = {
   analyze_token: (a) => `Reading ${a.token} on-chain stats & ${a.interval ?? "1h"} candles`,
   get_chain_overview: () => "Pulling Robinhood Chain market overview",
   scan_tokens: (a) => `Scanning ${a.list ?? "top"} tokens${a.signal ? ` for ${a.signal}` : ""}`,
-  get_new_launches: () => "Checking newest pools on Robinhood Chain",
+  get_new_launches: (a) => `Running the Launch Scanner${a.only && a.only !== "all" ? ` (${a.only} launches)` : ""} — contracts, first-minute bundles, copycats`,
   search_token: (a) => `Searching for “${a.query}”`,
   get_news: (a) => `Reading Robinhood Chain news${a.topic ? ` about ${a.topic}` : ""}`,
   get_token_scorecard: (a) => `Running safety scorecard on ${a.token} (holders, honeypot, dev wallet…)`,
@@ -570,7 +590,9 @@ Today is ${new Date().toISOString().slice(0, 10)}.
 Rules:
 - ALWAYS call tools before giving any number. Never invent prices, levels, liquidity or addresses.
 - Only state facts that appear in tool results. Never invent a safety grade or score (only get_token_scorecard gives one), never list contract functions, owners or implementation addresses that scan_contract did not return, and say "not checked" instead of guessing.
-- Token question → analyze_token (1h by default; add 4h/1d for swing context). Market question → get_chain_overview. Discovery → scan_tokens / get_new_launches.
+- Token question → analyze_token (1h by default; add 4h/1d for swing context). Market question → get_chain_overview. Discovery → scan_tokens / get_new_launches (the Launch Scanner: each launch has a launch grade and reasons; call out bundled launches clearly).
+- Never call a new launch "safe": a launch grade only means fewer red flags so far. Say "fewest red flags" and remind that brand-new tokens are high risk. A copycat is never a good pick.
+- When a tool returns a "report" link, end safety answers with it as a Markdown link (e.g. "Full report: [strixagents.com/t/PONS](https://strixagents.com/t/PONS)") so the user can share it.
 - You are a research agent, not a trading bot. Never tell the user what to buy or sell, never give entry / stop-loss / take-profit prices, position sizes or "long/short" setups, and never call anything "recommended" / "rekomendasi". If asked for a trade plan, say you only research and explain on-chain data and risk.
 - Safety questions ("aman ga?", rug, holder, trust) → get_token_scorecard. Whale / smart-money questions → get_whale_activity. For a full token review, call analyze_token AND get_token_scorecard.
 - Stock tokens vs real shares → get_stock_premiums. A wallet address (0x + 40 hex) → scan_wallet. If a wallet looksLikeBot, say it is a bot/relayer and should not be copied.
@@ -1039,8 +1061,13 @@ ${END}`,
 
   if (/\bnew\b|baru|launch|fresh|listing/.test(t)) {
     const r = await step("f0", "get_new_launches", {}, emit);
-    const d = (r?.data as Brief[] | undefined) ?? [];
-    return emit({ t: "answer", text: `### Newest pools on Robinhood Chain\n${NOTE}\n\n${HEAD}\n${d.slice(0, 12).map(row).join("\n")}\n\nNew pools are the riskiest corner of any chain — check liquidity and holders before buying.\n\n${END}` });
+    type L = { symbol: string; ageMinutes: number; liquidityUsd: number; launchGrade: string; launchScore: number; reasons: string[]; report: string };
+    const d = r?.data as { scanned: number; bundled: number; launches: L[] } | undefined;
+    const rows = (d?.launches ?? []).map((l) => `| **${l.symbol}** | ${l.launchGrade} (${l.launchScore}) | ${l.ageMinutes}m | ${usd(l.liquidityUsd)} | ${l.reasons[0] ?? "—"} | [report](${l.report}) |`);
+    return emit({
+      t: "answer",
+      text: `### Launch Scanner — newest tokens on Robinhood Chain\n${NOTE}\n\n${d ? `${d.scanned} launches in the last 24h, **${d.bundled} bundled** (many wallets taking a large share of supply in the first minute).\n\n` : ""}| Token | Launch grade | Age | Liquidity | Main reason | |\n|---|---|---|---|---|---|\n${rows.join("\n")}\n\nNew launches are the riskiest corner of any chain — check the full report before buying.\n\n${END}`,
+    });
   }
 
   const sig = SIGNAL_WORDS.find(([re]) => re.test(text))?.[1];

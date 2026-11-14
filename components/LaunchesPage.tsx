@@ -32,7 +32,7 @@ export function LaunchesPage() {
             <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-5xl">Launch Scanner</h1>
             <p className="mt-3 max-w-2xl text-zinc-400">
               Every token launched on Robinhood Chain in the last 24 hours, checked the moment it appears: admin powers in the contract, who bought in the first minute,
-              copycats, fake liquidity and spoofed volume — rolled into an early grade.
+              who the developer is and what they hold or sold, a live sell test, copycats, fake liquidity and spoofed volume — rolled into an early grade.
             </p>
           </div>
           <div className="font-mono text-xs text-muted">{data ? `updated ${new Date(data.scannedAt).toISOString().slice(11, 16)} UTC · refreshes every minute` : "scanning…"}</div>
@@ -83,7 +83,24 @@ export function LaunchesPage() {
                   </div>
                   <div className="text-right font-mono text-sm text-zinc-400">{l.score}/100</div>
                 </div>
-                <ul className="mt-4 space-y-1.5 text-sm">
+                <div className="mt-3 flex flex-wrap gap-2 font-mono text-[11px]">
+                  {l.dev ? (
+                    <span className="rounded-md border border-line px-2 py-1 text-zinc-300" title={l.dev.address}>
+                      dev {l.dev.address.slice(0, 6)}…{l.dev.address.slice(-4)} · holds {l.dev.holdingPct.toFixed(1)}% · moved {l.dev.movedPct.toFixed(1)}%{l.dev.launches > 1 ? ` · ${l.dev.launches} launches` : ""}
+                    </span>
+                  ) : (
+                    <span className="rounded-md border border-line px-2 py-1 text-zinc-500">dev unknown</span>
+                  )}
+                  <span className={`rounded-md border px-2 py-1 ${l.sellable === true ? "border-emerald-400/30 text-emerald-300" : l.sellable === false ? "border-rose-400/40 text-rose-300" : "border-line text-zinc-500"}`}>
+                    sell test {l.sellable === true ? "✓ passed" : l.sellable === false ? "✕ failed" : "– not yet"}
+                  </span>
+                  {l.snipers && (
+                    <span className={`rounded-md border px-2 py-1 ${l.snipers.sharePct >= 25 ? "border-rose-400/40 text-rose-300" : "border-line text-zinc-300"}`}>
+                      1st min · {l.snipers.buyers} wallets · {l.snipers.sharePct.toFixed(0)}%
+                    </span>
+                  )}
+                </div>
+                <ul className="mt-3 space-y-1.5 text-sm">
                   {l.reasons.slice(0, 4).map((r) => (
                     <li key={r.text} className={`flex gap-2 ${r.tone === "bad" ? "text-rose-300" : r.tone === "warn" ? "text-amber" : "text-emerald-300"}`}>
                       <span>{r.tone === "good" ? "✓" : r.tone === "bad" ? "✕" : "!"}</span>
@@ -104,7 +121,8 @@ export function LaunchesPage() {
 
         <p className="mt-10 text-xs leading-relaxed text-muted">
           How it works: the contract is read straight from the chain (admin functions in the bytecode); &ldquo;first minute&rdquo; counts the wallets that received the token from the
-          pool in its first 60 seconds and the share of total supply they took. A launch grade is an early warning built from on-chain data only — not a guarantee and not financial advice.
+          pool in its first 60 seconds and the share of total supply they took. The developer is the wallet that sent the minting transaction — &ldquo;moved&rdquo; is what it no longer
+          holds, excluding the liquidity it put into the pool. The sell test simulates a real buyer sending tokens back into the pool; a failure means holders may not be able to sell. A launch grade is an early warning built from on-chain data only — not a guarantee and not financial advice.
         </p>
       </main>
     </div>

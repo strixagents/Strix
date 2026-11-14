@@ -210,11 +210,14 @@ const commands = {
   },
 
   async new() {
-    await run("Checking new pools…", "get_new_launches", {}, (d) => {
-      console.log(`\n${bold("Newest pools on Robinhood Chain")}\n`);
-      for (const t of d)
-        console.log(`  ${pad(bold(t.symbol), 12)} ${pad(price(t.priceUsd), 14)} ${pad(pct(t.changePct.h24), 11)} liq ${pad(usd(t.liquidityUsd), 9)} age ${pad((t.poolAgeHours ?? 0) < 1 ? `${Math.round((t.poolAgeHours ?? 0) * 60)}m` : `${Math.round(t.poolAgeHours)}h`, 5)} ${riskColor(t.risk.level)} ${gray(t.risk.flags.join(", "))}`);
-      console.log(gray("\nNew pools are the riskiest corner of any chain.\n"));
+    const only = rest.includes("--safe") ? "safe" : rest.includes("--risky") ? "risky" : "all";
+    await run("Running the Launch Scanner…", "get_new_launches", { only }, (d) => {
+      console.log(`\n${bold("Launch Scanner")} ${gray(`· ${d.scanned} launches in 24h · ${d.bundled} bundled`)}\n`);
+      for (const l of d.launches) {
+        const g = ["A", "B"].includes(l.launchGrade) ? green(l.launchGrade) : l.launchGrade === "C" ? yellow(l.launchGrade) : red(l.launchGrade);
+        console.log(`  ${g} ${pad(String(l.launchScore), 4)} ${pad(bold(l.symbol), 12)} ${pad(`${l.ageMinutes}m`, 6)} liq ${pad(usd(l.liquidityUsd), 9)} ${gray(l.reasons[0] ?? "")}`);
+      }
+      console.log(gray("\nEarly launch grades from on-chain data — open a report with: strix safe <token>\n"));
     });
   },
 
@@ -321,7 +324,7 @@ ${bold("Usage")}
   strix safe <token>                Safety scorecard (A–F): honeypot, copycat, holders…
   strix whales <token>              Whale buys/sells, top wallets, wash-trading check
   strix scan [--list top|trending|new] [--signal momentum] [--max-risk Low]
-  strix new                         Newest pools with risk flags
+  strix new [--safe|--risky]        Launch Scanner: new tokens with launch grades
   strix stocks [ticker]             Stock tokens vs the real share price (premium/discount)
   strix wallet <0x…>                Wallet holdings, risk, spam filter and 24h trades
   strix search <name|symbol>        Find a token / pool

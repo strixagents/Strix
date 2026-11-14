@@ -102,12 +102,12 @@ server.registerTool(
 server.registerTool(
   "get_new_launches",
   {
-    title: "New launches",
-    description: "Newest pools / token launches on Robinhood Chain with liquidity and risk flags.",
-    inputSchema: {},
+    title: "Launch Scanner",
+    description: "Every token launched on Robinhood Chain in the last 24h with an early A–F launch grade: contract admin powers, bundled launches / first-minute snipers, copycats, fake or empty liquidity, spoofed volume.",
+    inputSchema: { only: z.enum(["all", "safe", "risky"]).optional().describe("safe = grades A–B and not a copycat, risky = D–F or copycats") },
     annotations: ro,
   },
-  () => call("get_new_launches", {})
+  ({ only }) => call("get_new_launches", { only: only ?? "all" })
 );
 
 server.registerTool(
