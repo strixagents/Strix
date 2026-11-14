@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Logo } from "./Logo";
+import { SearchButton } from "./QuickSearch";
 
 const links = [
   { href: "/agent", label: "Agent" },
@@ -51,6 +52,8 @@ export function Navbar() {
         </ul>
 
         <div className="flex items-center gap-2.5">
+          <SearchButton className="hidden md:inline-flex" />
+          <Link href="/me" className="hidden md:inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm text-zinc-300 transition hover:text-white" aria-label="My Strix">★<span className="hidden sm:inline">My Strix</span></Link>
           <Link href="/app" className="btn-secondary hidden px-4 py-2 text-[15px] sm:inline-flex xl:hidden 2xl:inline-flex">
             Analyst
           </Link>

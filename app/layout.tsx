@@ -4,6 +4,7 @@ import "./globals.css";
 import { AlertWatcher } from "@/components/AlertWatcher";
 import { PwaRegister } from "@/components/InstallApp";
 import { PushSync } from "@/components/Notifications";
+import { QuickSearch } from "@/components/QuickSearch";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
@@ -49,6 +50,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AlertWatcher />
         <PwaRegister />
         <PushSync />
+        <QuickSearch />
       </body>
     </html>
   );

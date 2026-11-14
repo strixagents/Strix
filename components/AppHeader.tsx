@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "./Logo";
 import { NetworkBadge } from "./market-ui";
+import { SearchButton } from "./QuickSearch";
 
 export const APP_NAV = [
   { href: "/agent", label: "Agent" },
@@ -43,6 +44,8 @@ export function AppHeader() {
         </Link>
         <AppNav className="hidden sm:flex" />
         <div className="ml-auto flex items-center gap-2">
+          <SearchButton />
+          <Link href="/me" className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm text-zinc-300 transition hover:text-white" aria-label="My Strix">★<span className="hidden sm:inline">My Strix</span></Link>
           <span className="hidden md:inline"><NetworkBadge /></span>
         </div>
       </div>

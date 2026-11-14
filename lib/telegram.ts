@@ -15,9 +15,9 @@ import type { RadarEvent } from "./radar";
  */
 
 type TgUser = { id: number; is_bot?: boolean };
-type TgChat = { id: number; type: "private" | "group" | "supergroup" | "channel" };
+type TgChat = { id: number; type: "private" | "group" | "supergroup" | "channel"; title?: string };
 type TgMessage = { message_id: number; chat: TgChat; from?: TgUser; text?: string; caption?: string };
-export type TgUpdate = { update_id: number; message?: TgMessage; channel_post?: TgMessage };
+export type TgUpdate = { update_id: number; message?: TgMessage; channel_post?: TgMessage; my_chat_member?: { chat: TgChat; new_chat_member: { status: string } } };
 
 const SITE = "https://strixagents.com";
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -185,6 +185,7 @@ export async function replyFor(u: TgUpdate): Promise<{ chatId: number; replyTo: 
     else if (name === "alerts") {
       const off = /^(off|stop|0|no)$/i.test(a);
       await setAlerts(m.chat.id, !off);
+      console.log(`[tg] alerts ${off ? "off" : "on"} · chat ${m.chat.id} (${m.chat.type}) ${m.chat.title ?? ""}`);
       html = off
         ? "🔕 Live rug alerts are <b>off</b> for this chat."
         : "🔔 Live rug alerts are <b>on</b>. I'll post here when a developer dumps, liquidity is pulled, a price crashes or supply is minted on Robinhood Chain.\n\nTurn off with <code>/alerts off</code>.";
@@ -197,6 +198,8 @@ export async function replyFor(u: TgUpdate): Promise<{ chatId: number; replyTo: 
 }
 
 export async function handleUpdate(u: TgUpdate) {
+  // log where the bot was added or removed, so a group can be pinned in TELEGRAM_ALERT_CHATS
+  if (u.my_chat_member) console.log(`[tg] bot is now ${u.my_chat_member.new_chat_member.status} · chat ${u.my_chat_member.chat.id} (${u.my_chat_member.chat.type}) ${u.my_chat_member.chat.title ?? ""}`);
   const r = await replyFor(u);
   if (!r) return;
   await tg("sendMessage", { chat_id: r.chatId, text: r.html, parse_mode: "HTML", reply_parameters: { message_id: r.replyTo, allow_sending_without_reply: true }, link_preview_options: { is_disabled: true } });

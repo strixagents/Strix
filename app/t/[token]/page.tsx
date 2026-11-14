@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { ShareReport } from "@/components/ShareReport";
+import { ReportChart, WatchButton } from "@/components/ReportTools";
 import { fmtAge, fmtPrice, fmtUsd, getReport, gradeTone, shareSlug } from "@/lib/report";
 import { links } from "@/lib/rhchain";
 
@@ -44,7 +45,7 @@ export default async function TokenReport({ params }: Props) {
   return (
     <div className="min-h-dvh bg-ink">
       <AppHeader />
-      <main className="mx-auto max-w-4xl px-4 pb-20 pt-10 sm:pt-14">
+      <main className="mx-auto max-w-5xl px-4 pb-20 pt-10 sm:pt-14">
         {/* token header */}
         <div className="flex flex-wrap items-center gap-4">
           {t.image ? (
@@ -59,9 +60,12 @@ export default async function TokenReport({ params }: Props) {
               ${t.symbol} <span className="text-lg font-normal text-muted sm:text-xl">{t.name}</span>
             </h1>
           </div>
-          <div className="ml-auto text-right">
+          <div className="ml-auto flex items-center gap-4">
+            <WatchButton pool={t.pool} symbol={t.symbol} />
+          <div className="text-right">
             <div className="font-mono text-2xl">{fmtPrice(t.price)}</div>
             <div className={`font-mono text-sm ${t.change.h24 >= 0 ? "text-emerald-300" : "text-rose-300"}`}>{t.change.h24 >= 0 ? "+" : ""}{t.change.h24.toFixed(2)}% 24h</div>
+          </div>
           </div>
         </div>
 
@@ -95,6 +99,11 @@ export default async function TokenReport({ params }: Props) {
               </li>
             ))}
           </ul>
+        </section>
+
+        {/* live chart + price alerts */}
+        <section className="mt-5">
+          <ReportChart pool={t.pool} symbol={t.symbol} price={t.price} />
         </section>
 
         {/* contract x-ray */}
