@@ -35,12 +35,12 @@ export function Navbar() {
           scrolled ? "border-[#2a2a2a] bg-[#0f0f0f]/85 backdrop-blur-xl" : "border-transparent bg-transparent"
         }`}
       >
-        <Link href="/" className="flex items-center gap-2.5">
+        <Link href="/" className="flex shrink-0 items-center gap-2.5">
           <Logo className="h-7 w-7 sm:h-8 sm:w-8" mono />
           <span className="text-xl font-medium tracking-tight sm:text-2xl">Strix</span>
         </Link>
 
-        <ul className="hidden items-center gap-7 text-[15px] text-muted xl:flex">
+        <ul className="mx-4 hidden items-center gap-5 whitespace-nowrap text-[14px] text-muted xl:flex 2xl:gap-7 2xl:text-[15px]">
           {links.map((l) => (
             <li key={l.href}>
               <Link href={l.href} className="transition-colors hover:text-white">
@@ -51,7 +51,7 @@ export function Navbar() {
         </ul>
 
         <div className="flex items-center gap-2.5">
-          <Link href="/app" className="btn-secondary hidden px-4 py-2 text-[15px] sm:inline-flex">
+          <Link href="/app" className="btn-secondary hidden px-4 py-2 text-[15px] sm:inline-flex xl:hidden 2xl:inline-flex">
             Analyst
           </Link>
           <Link href="/agent" className="btn-primary px-3.5 py-1.5 text-sm sm:px-4 sm:py-2 sm:text-[15px]">
